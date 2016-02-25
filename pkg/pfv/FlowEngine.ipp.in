@@ -187,6 +187,13 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 	solver->IFCells.push_back(cell);
 }
 template< class _CellInfo, class _VertexInfo, class _Tesselation, class solverT >
+void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,solverT>::imposeFluxFromId(unsigned long id, Real flux)
+{
+	imposeFlux(cellBarycenterFromId(id),flux);
+}
+
+
+template< class _CellInfo, class _VertexInfo, class _Tesselation, class solverT >
 void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,solverT>::clearImposedPressure () { solver->imposedP.clear(); solver->IPCells.clear();}
 template< class _CellInfo, class _VertexInfo, class _Tesselation, class solverT >
 void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,solverT>::clearImposedFlux () { solver->imposedF.clear(); solver->IFCells.clear();}

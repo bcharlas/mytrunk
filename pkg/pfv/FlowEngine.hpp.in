@@ -97,6 +97,7 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 			solver->pressureChanged=true;}
 
 		void imposeFlux(Vector3r pos, Real flux);
+		void imposeFluxFromId(unsigned long id, Real flux);
 		unsigned int imposePressure(Vector3r pos, Real p);
 		unsigned int imposePressureFromId(unsigned long id, Real p);
 		void setImposedPressure(unsigned int cond, Real p);
@@ -309,6 +310,7 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 		metisForced=false;
 		,
 		.def("imposeFlux",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::imposeFlux,(boost::python::arg("pos"),boost::python::arg("p")),"Impose a flux in cell located  at 'pos' (i.e. add a source term in the flow problem). Outflux positive, influx negative.")
+		.def("imposeFluxFromId",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::imposeFluxFromId,(boost::python::arg("id"),boost::python::arg("flux")),"Impose flux in cell of index 'id' (after remeshing the same condition will apply for the same location, regardless of what the new cell index is at this location).")
 		.def("imposePressureFromId",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::imposePressureFromId,(boost::python::arg("id"),boost::python::arg("p")),"Impose pressure in cell of index 'id' (after remeshing the same condition will apply for the same location, regardless of what the new cell index is at this location). The index of the condition itself is returned (for multiple imposed pressures at different points).")
 		.def("imposePressure",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::imposePressure,(boost::python::arg("pos"),boost::python::arg("p")),"Impose pressure in cell of location 'pos'. The index of the condition is returned (for multiple imposed pressures at different points).")
 		.def("setImposedPressure",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::setImposedPressure,(boost::python::arg("cond"),boost::python::arg("p")),"Set pressure value at the point indexed 'cond'.")
@@ -375,6 +377,7 @@ class FlowCellInfo_@TEMPLATE_FLOW_NAME@ : public CGT::SimpleCellInfo {
 	int fict;
  	Real volumeVariation;
 	double pression;
+	
 	 //average relative (fluid - facet translation) velocity defined for a single cell as 1/Volume * SUM_ON_FACETS(x_average_facet*average_facet_flow_rate)
 	CVector averageCellVelocity;
 	// Surface vectors of facets, pointing from outside toward inside the cell
@@ -417,6 +420,7 @@ class FlowCellInfo_@TEMPLATE_FLOW_NAME@ : public CGT::SimpleCellInfo {
 	inline Real& dv (void) {return volumeVariation;}
 	inline int& fictious (void) {return fict;}
 	inline double& p (void) {return pression;}
+	
 	inline const double shiftedP (void) const {return pression;} //For compatibility with the periodic case
 	inline const std::vector<double>& kNorm (void) const {return modulePermeability;}
 	inline std::vector<double>& kNorm (void) {return modulePermeability;}
