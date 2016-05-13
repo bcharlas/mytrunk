@@ -114,6 +114,7 @@ class ThermalFlowEngine : public ThermalFlowEngineT
 		void setBodyTemperature(int id, double temperature);
 		double getBodyTemperature(int id);
 		//
+		
 		void setBodyCp(int id, double cp);
 		double getBodyCp(int id);
 		//
