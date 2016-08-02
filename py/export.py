@@ -4,7 +4,7 @@ Export (not only) geometry to various formats.
 """
 
 from yade.wrapper import *
-from yade import utils,Matrix3,Vector3
+from yade import utils,Matrix3,Vector3, bodyHeat, cellHeat, sorption #heat, reaction
 
 #textExt===============================================================
 def textExt(filename, format='x_y_z_r', comment='',mask=-1,attrs=[]):

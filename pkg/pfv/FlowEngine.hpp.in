@@ -184,7 +184,7 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 		CELL_VECTOR_GETTER(,cellCenter)
 		CELL_VECTOR_GETTER(.averageCellVelocity,cellVelocity)
 		CELL_SCALAR_GETTER(double,.p(),cellPressure)
-		CELL_SCALAR_SETTER_EXTRA(double,.p(),setCellPressure,solver->resetRHS())
+		CELL_SCALAR_SETTER_EXTRA(double,.p(),setCellPressure,solver->resetRHS())// setter not working: the new pressure goes into the cell, but the the value returns to before at the next step
 		CELL_SCALAR_GETTER(bool,.Pcondition,cellPImposed)
 		CELL_SCALAR_SETTER_EXTRA(bool,.Pcondition,setCellPImposed,solver->resetLinearSystem())
 		boost::python::list getVertices(unsigned int id){
@@ -226,10 +226,47 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 			solver->T[solver->currentTes].compute();
 			solver->T[solver->currentTes].computeVolumes();
 		}
+		
+		Real getCellVoidVolume(int id)
+		{
+		  CellHandle& cell = solver->T[solver->currentTes].cellHandles[id]; 
+		  //return std::abs(cell->info().volume()) - flow.volumeSolidPore(cell);//where is flow defined?
+		  //return cell->info().poreBodyVolume;
+		  return std::abs( cell->info().volume() ) - std::abs(solver->volumeSolidPore(cell));
+		}
+		
+		Real getCellVolume(int id)
+		{
+		  CellHandle& cell = solver->T[solver->currentTes].cellHandles[id]; 
+		  return std::abs(cell->info().volume());
+		}
+		
 		Real getVolume (Body::id_t id) {
 			if (solver->T[solver->currentTes].Max_id() <= 0) {emulateAction(); /*LOG_WARN("Not triangulated yet, emulating action");*/}
 			if (solver->T[solver->currentTes].Volume(id) == -1) {compTessVolumes();/* LOG_WARN("Computing all volumes now, as you did not request it explicitely.");*/}
 			return (solver->T[solver->currentTes].Max_id() >= id) ? solver->T[solver->currentTes].Volume(id) : -1;}
+		
+		double kNorm(unsigned int id, unsigned int ngb){
+		  //CELL_SCALAR_GETTER(double,.kNorm(),kNorm)
+		  return (solver->T[solver->currentTes].cellHandles[id]->info().kNorm())[ngb];
+		}
+		//
+		boost::python::list getCellNeighbor(unsigned int id){
+		  boost::python::list ids;
+		  if (id>=solver->T[solver->currentTes].cellHandles.size()) {LOG_ERROR("id out of range, max value is "<<solver->T[solver->currentTes].cellHandles.size()); return ids;}
+		  for (unsigned int i=0;i<4;i++) ids.append(solver->T[solver->currentTes].cellHandles[id]->neighbor(i)->info().index);
+		  //for (unsigned int i=0;i<4;i++) ids.append(solver->T[solver->currentTes].cellHandles[id]->vertex(i)->info().id());
+		  return ids;
+		}
+		//
+		bool isDrawable(unsigned int id)
+		{
+		  CellHandle cell;
+		  cell = solver->T[solver->currentTes].cellHandles[id];
+		  bool isD;
+		  isD =cell->info().isReal() && cell->vertex(0)->info().isReal() && cell->vertex(1)->info().isReal() && cell->vertex(2)->info().isReal()  && cell->vertex(3)->info().isReal();
+		  return isD;
+		}
 
 		YADE_CLASS_PYCLASS_BASE_DOC_ATTRS_DEPREC_INIT_CTOR_PY(TemplateFlowEngine_@TEMPLATE_FLOW_NAME@,@TEMPLATE_FLOW_NAME@,PartialEngine,"A generic engine from wich more specialized engines can inherit. It is defined for the sole purpose of inserting the right data classes CellInfo and VertexInfo in the triangulation, and it should not be used directly. Instead, look for specialized engines, e.g. :yref:`FlowEngine`, :yref:`PeriodicFlowEngine`, or :yref:`DFNFlowEngine`.",
 		((bool,isActivated,true,,"Activates Flow Engine"))
@@ -360,7 +397,14 @@ class TemplateFlowEngine_@TEMPLATE_FLOW_NAME@ : public PartialEngine
 		#endif
 		.def("compTessVolumes",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::compTessVolumes,"Like TesselationWrapper::computeVolumes()")
 		.def("volume",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getVolume,(boost::python::arg("id")=0),"Returns the volume of Voronoi's cell of a sphere.")
+		.def("volumePore",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getCellVolume,(boost::python::arg("id")=0),"Returns the pore (or cell) volume.")
+		.def("volumeVoidPore",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getCellVoidVolume,(boost::python::arg("id")=0),"Returns the void volume (or fluid Volume) inside a pore.")
 		.def("averageVelocity",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::averageVelocity,"measure the mean velocity in the period")
+		//
+		.def("kNorm",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::kNorm,(boost::python::arg("id"),boost::python::arg("ngb")),"get constriction factor of exchange between cell 'id' and its neighbor 'ngb'.")
+		.def("getCellNeighbor",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::getCellNeighbor,(boost::python::arg("id")),"get the neighboring cells of a cell")
+		//
+		.def("isDrawable",&TemplateFlowEngine_@TEMPLATE_FLOW_NAME@::isDrawable,(boost::python::arg("id")),"is the cell drawable")
 		)
 };
 
