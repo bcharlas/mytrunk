@@ -125,7 +125,7 @@ def sorption(flow):
     
     # ABSORPTION / DESORPTION
     for i in range(flow.nCells()):
-        Tc=cellTemp[i]
+        Tc=cellHeat.cellTemp[i]
         pc=flow.getCellPressure(i)
         Vc=flow.volumeVoidPore(i)
         #
@@ -138,16 +138,16 @@ def sorption(flow):
                     Rb = O.bodies[b].shape.radius
                     #
                     peq=np.exp(-DH_surf/R/Tb + DS/R) * p0
-                    prel=(pc-peq)/peq
+                    p_rel=(pc-peq)/peq
                     #
                     #
-                    r_a=M_NH3*k_a*exp(-E_a/(R*Tb))*(1-s)**M_a*p_rel**N_a # absorption reaction rate
-                    r_d=M_NH3*k_d*exp(-E_d/(R*Tb))*(s)**M_d*p_rel**N_d # desorption reaction rate
+                    r_a=M_NH3*k_a*np.exp(-E_a/(R*Tb))*(1-s)**M_a*p_rel**N_a # absorption reaction rate
+                    r_d=M_NH3*k_d*np.exp(-E_d/(R*Tb))*(s)**M_d*p_rel**N_d # desorption reaction rate
                     #
                     r=r_a-r_d # overal reaction rate
                     #
                     if not( ((r>0) and (s>= s_max))   or   ((r<0) and (s <= 0))  ):
-                        incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # mass increment of the body
+                        incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
                         cellHeat.incP[i] -= r*O.dt * R * Tc / Vc # pressure increment of the cell
                         bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt # temperature increment of the body due to reaction exo/endo-thermy
     
@@ -169,14 +169,15 @@ def sorption(flow):
                 r1=O.bodies[i.id1].shape.radius
                 r2=O.bodies[i.id2].shape.radius
                 #
+                pene=i.geom.penetrationDepth
                 if pene >0. :
                     rij = np.sqrt(0.5*(r1+r2)*pene-pene**2/4)# radius of the contact interface
                     #
                     T1=bodyHeat.bodyTemp[index1]
                     T2=bodyHeat.bodyTemp[index2]
                     
-                    diffCoef1=M_NH3*k_a*exp(-E_a/(R*T1))# t / mm ARBITRARY NOW
-                    diffCoef2=M_NH3*k_a*exp(-E_a/(R*T2))# t / mm ARBITRARY NOW
+                    diffCoef1=M_NH3*k_a*np.exp(-E_a/(R*T1))# t / mm ARBITRARY NOW
+                    diffCoef2=M_NH3*k_a*np.exp(-E_a/(R*T2))# t / mm ARBITRARY NOW
                     
                     # dSat = surface * diff coef/distance  * Delta_s * time
                     dSat =  rij**2 * np.pi / ((r1/diffCoef1+r2/diffCoef2)) * (s1-s2) * O.dt

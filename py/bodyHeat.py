@@ -25,7 +25,7 @@ isoThermalList=[]
 #
 g_pi=3.14
 
-surfaceRatio=0.5
+surfaceRatio=1.
 
 def initHeatProps(bodies, iniTemp, Cp, heatCond, flowThermalExchange=False):
   
