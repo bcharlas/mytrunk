@@ -12,7 +12,7 @@ import bodyHeat
 import cellHeat
 
 
-mass_scaling=1.
+mass_scaling=1e12
 
 
 
@@ -52,7 +52,7 @@ k_1= 0.1 #mJ/mm/K/s
 k_8= 0.48 #mJ/mm/K/s
 DL=0.025# fictive distance between salt and wall in m
 
-s_max=8
+s_max=1
 
 # Initial parameters
 #---------------
@@ -92,6 +92,7 @@ def initSorpPropsList(bodyList, s_ini, s_max, Cp):
   global bodySat
   global V0
   
+  
   sorpBodies=[]
   #
   incBodySorp = []
@@ -129,7 +130,7 @@ def sorption(flow):
         pc=flow.getCellPressure(i)
         Vc=flow.volumeVoidPore(i)
         #
-        if Vc>0:
+        if Vc>0. and pc>0.:
             for b in flow.getVertices(i):
                 if b in sorpBodies:  
                     s= bodySat[sorpBodies.index(b)] # saturation degree
@@ -146,10 +147,16 @@ def sorption(flow):
                     #
                     r=r_a-r_d # overal reaction rate
                     #
-                    if not( ((r>0) and (s>= s_max))   or   ((r<0) and (s <= 0))  ):
-                        incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
-                        cellHeat.incP[i] -= r*O.dt * R * Tc / Vc # pressure increment of the cell
-                        bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt # temperature increment of the body due to reaction exo/endo-thermy
+                    if not( ((r>0) and (s>= s_max))   and   ((r<0) and (s <= 0))  ):
+                        if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s < s_max):
+                            if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s > 0):
+                                if (pc + cellHeat.incP[i] - r*O.dt * R * Tc / Vc) > 0:# safety to avoid having negative pressure
+                                    incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
+                                    # pressure increment of the cell
+                                    cellHeat.incP[i] -= r*O.dt * R * Tc / Vc
+                                    # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
+                                    bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt 
+                                    
     
     # DIFFUSION IN THE BODIES: transfer as soon as the saturation degree is higher
     for i in O.interactions:
@@ -182,9 +189,13 @@ def sorption(flow):
                     # dSat = surface * diff coef/distance  * Delta_s * time
                     dSat =  rij**2 * np.pi / ((r1/diffCoef1+r2/diffCoef2)) * (s1-s2) * O.dt
                     #
-                    # mass increment
-                    incBodySorp[index1] += dSat*m02/(m01+m02)*0.8594 # scaling difference to the mass - 
-                    incBodySorp[index2] -= dSat*m01/(m01+m02)*0.8594 # scaling difference to the mass - 
+                    # mass increment - checking if mass remains >0 
+                    if not( ((dSat>0) and (s1>= s_max))   and   ((dSat<0) and (s1 <= 0))  ):
+                        if not( ((dSat<0) and (s2>= s_max))   and   ((dSat>0) and (s2 <= 0))  ):
+                            if ((incBodySorp[index1] + dSat*m02/(m01+m02)*0.8594)>0) or (abs(incBodySorp[index1] + dSat*m02/(m01+m02)*0.8594)<O.bodies[i.id1].state.mass):
+                                if ((incBodySorp[index2] + dSat*m01/(m01+m02)*0.8594)>0) or (abs(incBodySorp[index2] + dSat*m01/(m01+m02)*0.8594)<O.bodies[i.id2].state.mass):
+                                    incBodySorp[index1] += dSat*m02/(m01+m02)*0.8594 # scaling difference to the mass - 
+                                    incBodySorp[index2] -= dSat*m01/(m01+m02)*0.8594 # scaling difference to the mass - 
                     #
                     # temperature increments of the bodies
                     bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(i.id1)] +=DH*dSat*m02/(m01+m02)*0.8594/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(i.id1)] * O.dt # temperature increment of the body due to reaction exo/endo-thermy
