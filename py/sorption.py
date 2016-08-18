@@ -12,7 +12,7 @@ import bodyHeat
 import cellHeat
 
 
-mass_scaling=1e12
+mass_scaling=1.0e12
 
 
 
@@ -25,6 +25,11 @@ DS=228.1*1e3 # mJ/mol/K
 #
 p0=1e-6# MPa
 #
+#reference parameters in which the model was calculated
+refWeight=5.1*1e-6*mass_scaling# weight in t corresponding to paper "Surface adsorption in strontium chloride ammines"
+refRad=70e-3/2#radius in mm of the average grain size in the reference mesurement
+refVol=90.*1e-3#volume of gas used in the reference mesurement
+
 E_a=32.9*1e6 # mJ/mol
 k_a=9.5e3 #mol/s
 M_a=1. # check unit
@@ -131,34 +136,72 @@ def sorption(flow):
         Vc=flow.volumeVoidPore(i)
         #
         if Vc>0. and pc>0.:
+            # HERE INSERT A LIST OF 4 "r" so that the r will be adjusted if it is too big
+            r_List=[]
+            #
             for b in flow.getVertices(i):
-                if b in sorpBodies:  
+                if b in sorpBodies:
                     s= bodySat[sorpBodies.index(b)] # saturation degree
                     #
                     Tb = bodyHeat.bodyTemp[bodyHeat.heatBodies.index(b)]
                     Rb = O.bodies[b].shape.radius
                     #
-                    peq=np.exp(-DH_surf/R/Tb + DS/R) * p0
+                    Ksurf=-DH_surf/R/Tb + DS/R 
+                    peq=np.exp(Ksurf) * p0
                     p_rel=(pc-peq)/peq
                     #
+                    ###
+                    '''
+                    mu = 30 # Hz
+                    D_E_in=10.0*1e6# mJ/mol
+                    D_E_tot=41.4*1e6#mJ/mol
+                    D_E_surf=DH_surf
+                    D_E_out=D_E_tot-D_E_surf+D_E_in
+                    gamma=100.
                     #
-                    r_a=M_NH3*k_a*np.exp(-E_a/(R*Tb))*(1-s)**M_a*p_rel**N_a # absorption reaction rate
-                    r_d=M_NH3*k_d*np.exp(-E_d/(R*Tb))*(s)**M_d*p_rel**N_d # desorption reaction rate
+                    kp=mu*np.exp(-D_E_in/(R*T))
+                    theta = Ksurf*pc/(1+Ksurf*pc)#adsorption reaction from Langmuir adsorption
+                    nS=bodyMass0[sorpBodies.index(b)](1- 0.8594*s)/M_0 * 8 # number of free sites in moles
+                    '''
+                    ###
                     #
-                    r=r_a-r_d # overal reaction rate
+                    r_a=k_a*np.exp(-E_a/(R*Tb))*(1-s)**M_a*p_rel**N_a # absorption reaction rate
+                    r_d=k_d*np.exp(-E_d/(R*Tb))*(s)**M_d*p_rel**N_d # desorption reaction rate
                     #
-                    if not( ((r>0) and (s>= s_max))   and   ((r<0) and (s <= 0))  ):
+                    r=(r_a-r_d) * bodyMass0[sorpBodies.index(b)] /refWeight * pow((refRad/Rb),0.25) * Vc/refVol #overal reaction rate
+                    #
+                    
+                    if (r>0) and (s < s_max):
+                        '''
+                        r_List.append((r,
+                                       M_NH3*r*O.dt, # MASS increment of the body
+                                       r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs()), # incP
+                                       DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt) # incBodyTemp
+                                       )
+                        '''
                         if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s < s_max):
-                            if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s > 0):
-                                if (pc + cellHeat.incP[i] - r*O.dt * R * Tc / Vc) > 0:# safety to avoid having negative pressure
-                                    incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
-                                    # pressure increment of the cell
-                                    cellHeat.incP[i] -= r*O.dt * R * Tc / Vc
-                                    # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
-                                    bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt 
+                            
+                            if (pc + cellHeat.incP[i] - r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())) > 0:# safety to avoid having negative pressure
+                                incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
+                                # pressure increment of the cell
+                                cellHeat.incP[i] -= r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())
+                                # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
+                                bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt 
+                            else:
+                                print("Pressure increment too big !!!  dP:" + str(r*O.dt * R * Tc / Vc))
+                        else:
+                            print('s :' + str(s) + '    (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] :' + str((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)]))
+                    elif r<0 and (s>0):
+                        if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s > 0):
+                            incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
+                            # pressure increment of the cell
+                            cellHeat.incP[i] -= r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())
+                            # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
+                            bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(b)] +=DH_surf*r/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(b)] * O.dt 
                                     
     
     # DIFFUSION IN THE BODIES: transfer as soon as the saturation degree is higher
+    '''
     for i in O.interactions:
         if i.id1 in sorpBodies and i.id2 in sorpBodies:
             #
@@ -200,7 +243,7 @@ def sorption(flow):
                     # temperature increments of the bodies
                     bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(i.id1)] +=DH*dSat*m02/(m01+m02)*0.8594/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(i.id1)] * O.dt # temperature increment of the body due to reaction exo/endo-thermy
                     bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(i.id2)] +=DH*dSat*m01/(m01+m02)*0.8594/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(i.id2)] * O.dt
-                    
+    '''
                 
 
 '''
