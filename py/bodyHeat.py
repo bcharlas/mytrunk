@@ -148,9 +148,9 @@ def heatConductivity():
                             dQ = surfaceRatio* 1./4. * dij**2 * np.pi / ((r1/k1+r2/k2)) * (T1-T2) 
                             #
                             if (i.id1 not in isoThermalList) and (abs(O.dt *dQ/(m1*listCp[index1])) < abs(T1-T2)):
-                                incBodyTemp[index1]-=O.dt *dQ/(O.bodies[i.id1].state.mass*listCp[index1])
+                                incBodyTemp[index1]-=O.dt *dQ/(O.bodies[i.id1].state.mass*listCp[index1])  * O.bodies[i.id2].state.mass /(O.bodies[i.id1].state.mass+O.bodies[i.id2].state.mass)
                             if (i.id2 not in isoThermalList) and (abs(O.dt *dQ/(m2*listCp[index2])) < abs(T1-T2)):
-                                incBodyTemp[index2]+=O.dt *dQ/(O.bodies[i.id2].state.mass*listCp[index2])
+                                incBodyTemp[index2]+=O.dt *dQ/(O.bodies[i.id2].state.mass*listCp[index2]) * O.bodies[i.id2].state.mass /(O.bodies[i.id1].state.mass+O.bodies[i.id2].state.mass)
         '''    
         for bIndex in range(len(bodyTemp)):
             bodyTemp[bIndex] += incBodyTemp[bIndex]
