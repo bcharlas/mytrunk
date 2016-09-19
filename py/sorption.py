@@ -12,7 +12,7 @@ import bodyHeat
 import cellHeat
 
 
-mass_scaling=1.0e14
+mass_scaling=1.0e21
 
 
 
@@ -143,6 +143,8 @@ def sorption(flow):
             dr=0.
             dP = 0
             #
+            mc=pc * Vc * M_NH3 / (R*Tc)
+            #
             for b in flow.getVertices(i):
                 if b in sorpBodies:
                     s= bodySat[sorpBodies.index(b)] # saturation degree
@@ -150,6 +152,7 @@ def sorption(flow):
                     Tb = bodyHeat.bodyTemp[bodyHeat.heatBodies.index(b)]
                     #
                     peq=pc# to be checked
+                    
                     if Tb> DH_surf/DS:
                         Rb = O.bodies[b].shape.radius
                         #
@@ -186,7 +189,8 @@ def sorption(flow):
                         else:
                             r= r_d
                         
-                        r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * Vc/refVol * 100.
+                        
+                        r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100.
                         
                         if r>0 and (((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)]) +s < s_max)) and ( ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/k_m/bodyMass0[sorpBodies.index(b)] +s>0.)):
                             #print (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)])
@@ -196,10 +200,22 @@ def sorption(flow):
 
             
             ratioP = 1.
-            if (pc + cellHeat.incP[i] + dP < peq) and dP != 0:# correction if pressure increment is too big
-                ratioP = abs((pc + cellHeat.incP[i])/dP)
+            if (pc + cellHeat.incP[i] + dP < max(peq,0.)) and dP < 0.:# correction if pressure decrement is too big
+                if pc + cellHeat.incP[i]< max(peq,0.):
+                    ratioP= 0.
+                else:
+                    ratioP = (peq-(pc + cellHeat.incP[i])) / dP
+                    print('ratioP ' +str(ratioP))
+                    print('pc ' +str(pc))
+                    print('cellHeat.incP[i] ' +str(cellHeat.incP[i]))
+                    print('dP ' +str(dP))
+                    print('pc + cellHeat.incP[i] + ratioP*dP ' +str(pc + cellHeat.incP[i] + ratioP*dP))
+                    print
             #
+            ratioP = ratioP
             cellHeat.incP[i] += ratioP * dP
+            #
+            
             #
             #print('rList' + str(r_List))
             for i in range(len(r_List)):

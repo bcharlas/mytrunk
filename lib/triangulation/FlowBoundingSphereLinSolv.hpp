@@ -48,6 +48,7 @@ public:
 	using FlowType::tolerance;
 	using FlowType::relax;
 	using FlowType::fluidBulkModulus;
+	using FlowType::isCompressible;
 	using FlowType::reApplyBoundaryConditions;
 	using FlowType::pressureChanged;
 	using FlowType::computedOnce;

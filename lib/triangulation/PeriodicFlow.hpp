@@ -28,7 +28,7 @@ namespace CGT{
 		
 		//painfull, but we need that for templates inheritance...
 		using _N::T; using _N::xMin; using _N::xMax; using _N::yMin; using _N::yMax; using _N::zMin; using _N::zMax; using _N::Rmoy; using _N::sectionArea; using _N::Height; using _N::vTotal; using _N::currentTes; using _N::debugOut; using _N::nOfSpheres; using _N::xMinId; using _N::xMaxId; using _N::yMinId; using _N::yMaxId; using _N::zMinId; using _N::zMaxId; using _N::boundsIds; using _N::cornerMin; using _N::cornerMax;  using _N::VSolidTot; using _N::Vtotalissimo; using _N::vPoral; using _N::sSolidTot; using _N::vPoralPorosity; using _N::vTotalPorosity; using _N::boundaries; using _N::idOffset; using _N::vtkInfiniteVertices; using _N::vtkInfiniteCells; using _N::num_particles; using _N::boundingCells; using _N::facetVertices; using _N::facetNFictious;
-		using BaseFlowSolver::noCache; using BaseFlowSolver::rAverage; using BaseFlowSolver::distanceCorrection; using BaseFlowSolver::minPermLength; using BaseFlowSolver::checkSphereFacetOverlap; using BaseFlowSolver::viscosity; using BaseFlowSolver::kFactor; using BaseFlowSolver::permeabilityMap; using BaseFlowSolver::maxKdivKmean; using BaseFlowSolver::clampKValues; using BaseFlowSolver::KOptFactor; using BaseFlowSolver::meanKStat; using BaseFlowSolver::fluidBulkModulus; using BaseFlowSolver::relax; using BaseFlowSolver::tolerance; using BaseFlowSolver::minKdivKmean; using BaseFlowSolver::resetRHS;
+		using BaseFlowSolver::noCache; using BaseFlowSolver::rAverage; using BaseFlowSolver::distanceCorrection; using BaseFlowSolver::minPermLength; using BaseFlowSolver::checkSphereFacetOverlap; using BaseFlowSolver::viscosity; using BaseFlowSolver::kFactor; using BaseFlowSolver::permeabilityMap; using BaseFlowSolver::maxKdivKmean; using BaseFlowSolver::clampKValues; using BaseFlowSolver::KOptFactor; using BaseFlowSolver::meanKStat; using BaseFlowSolver::isCompressible; using BaseFlowSolver::fluidBulkModulus; using BaseFlowSolver::relax; using BaseFlowSolver::tolerance; using BaseFlowSolver::minKdivKmean; using BaseFlowSolver::resetRHS;
 		
 		//same for functions
 		using _N::defineFictiousCells; using _N::addBoundingPlanes; using _N::boundary;
@@ -396,14 +396,19 @@ void PeriodicFlow<_Tesselation>::gaussSeidel(Real dt)
             bb++;
             if ( !cell->info().Pcondition && !cell->info().isGhost) {
 		cell2++;
-		if (compressible && j==0) previousP[bb]=cell->info().shiftedP();
+		if (isCompressible && j==0) previousP[bb]=cell->info().shiftedP();
 		m=0, n=0;
 		for (int j2=0; j2<4; j2++) {
 		  if (!Tri.is_infinite(cell->neighbor(j2))) {
-			if ( compressible ) {
-				compFlowFactor = fluidBulkModulus*dt*cell->info().invVoidVolume();
-				m += compFlowFactor*(cell->info().kNorm())[j2]*cell->neighbor(j2)->info().shiftedP();
-				if (j==0) n += compFlowFactor*(cell->info().kNorm())[j2];
+			if ( isCompressible ) {
+			  if (fluidBulkModulus>0){
+			    compFlowFactor = fluidBulkModulus*dt*cell->info().invVoidVolume();
+			  } else {
+			    // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+			    compFlowFactor = cell->info().p()*dt*cell->info().invVoidVolume();
+			  }
+			  m += compFlowFactor*(cell->info().kNorm())[j2]*cell->neighbor(j2)->info().shiftedP();
+			  if (j==0) n += compFlowFactor*(cell->info().kNorm())[j2];
 			} else {
 				m += (cell->info().kNorm())[j2]*cell->neighbor(j2)->info().shiftedP();
 				if ( isinf(m) && j<10 ) cout << "(cell->info().kNorm())[j2] = " << (cell->info().kNorm())[j2] << " cell->neighbor(j2)->info().shiftedP() = " << cell->neighbor(j2)->info().shiftedP() << endl;
@@ -413,9 +418,14 @@ void PeriodicFlow<_Tesselation>::gaussSeidel(Real dt)
 		}
 		dp = cell->info().p();
 		if (n!=0 || j!=0) {
-			if (j==0) { if (compressible) cell->info().invSumK=1/(1+n); else cell->info().invSumK=1/n; }
-			if ( compressible ) { 
-				cell->info().setP( ( ((previousP[bb] - ((fluidBulkModulus*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().shiftedP()) * relax + cell->info().shiftedP());
+			if (j==0) { if (isCompressible) cell->info().invSumK=1/(1+n); else cell->info().invSumK=1/n; }
+			if ( isCompressible ) { 
+			  if (fluidBulkModulus>0){
+			    cell->info().setP( ( ((previousP[bb] - ((fluidBulkModulus*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().shiftedP()) * relax + cell->info().shiftedP());
+			  } else {
+			    // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+			    cell->info().setP( ( ((previousP[bb] - ((cell->info().p()*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().shiftedP()) * relax + cell->info().shiftedP());
+			  }
 			} else {
 				cell->info().setP((-(cell->info().dv()-m)*cell->info().invSumK-cell->info().p())*relax+cell->info().shiftedP());
 			}

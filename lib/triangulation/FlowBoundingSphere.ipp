@@ -58,7 +58,8 @@ FlowBoundingSphere<Tesselation>::FlowBoundingSphere()
 	sectionArea = 0, Height=0, vTotal=0;
 	vtkInfiniteVertices=0, vtkInfiniteCells=0;
 	viscosity = 1;
-	fluidBulkModulus = 0;
+	fluidBulkModulus = 0; // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+	isCompressible=false; 
 	tessBasedForce = true;
 	for (int i=0;i<6;i++) boundsIds[i] = 0;
 	minPermLength=-1;
@@ -841,7 +842,7 @@ void FlowBoundingSphere<Tesselation>::gaussSeidel(Real dt)
 	vector<Real> previousP;
 	previousP.resize(Tri.number_of_finite_cells());
 	const int num_threads=1;
-	bool compressible= (fluidBulkModulus>0);
+	//bool compressible= (fluidBulkModulus>0); 
 #ifdef GS_OPEN_MP
 	omp_set_num_threads(num_threads);
 #endif
@@ -883,15 +884,20 @@ void FlowBoundingSphere<Tesselation>::gaussSeidel(Real dt)
 			if ( !cell->info().Pcondition && !cell->info().blocked) {
 		                cell2++;
 		#endif
-				if (compressible && j==0) { previousP[bb]=cell->info().p(); }
+				if (isCompressible && j==0) { previousP[bb]=cell->info().p(); }
 				m=0, n=0;
 				for (int j2=0; j2<4; j2++) {
 					if (!Tri.is_infinite(cell->neighbor(j2))) { 
 						/// COMPRESSIBLE: 
-						if ( compressible ) {
+						if ( isCompressible ) {
+						  if (fluidBulkModulus>0) {
 							compFlowFactor = fluidBulkModulus*dt*cell->info().invVoidVolume();
-							m += compFlowFactor*(cell->info().kNorm())[j2] * cell->neighbor(j2)->info().p();
-							if (j==0) n +=compFlowFactor*(cell->info().kNorm())[j2];
+						  }else {
+							// gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+							compFlowFactor = cell->info().p()*dt*cell->info().invVoidVolume();
+						  }
+						  m += compFlowFactor*(cell->info().kNorm())[j2] * cell->neighbor(j2)->info().p();
+						  if (j==0) n +=compFlowFactor*(cell->info().kNorm())[j2];
 						} else {							
 						/// INCOMPRESSIBLE 
 							m += (cell->info().kNorm())[j2] * cell->neighbor(j2)->info().p();
@@ -902,10 +908,16 @@ void FlowBoundingSphere<Tesselation>::gaussSeidel(Real dt)
 				}
 				dp = cell->info().p();
 				if (n!=0 || j!=0) {
-					if (j==0) { if (compressible) cell->info().invSumK=1/(1+n); else cell->info().invSumK=1/n; }
-					if ( compressible ) {
+					if (j==0) { if (isCompressible) cell->info().invSumK=1/(1+n); else cell->info().invSumK=1/n; }
+					if ( isCompressible ) {
 					/// COMPRESSIBLE cell->info().p() = ( (previousP - compFlowFactor*cell->info().dv()) + m ) / n ;
-						cell->info().p() = ( ((previousP[bb] - ((fluidBulkModulus*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().p()) * relax + cell->info().p();
+					  if (fluidBulkModulus>0){
+					    cell->info().p() = ( ((previousP[bb] - ((fluidBulkModulus*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().p()) * relax + cell->info().p();
+					  } else {
+					    // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+					    cell->info().p() = ( ((previousP[bb] - ((cell->info().p()*dt*cell->info().invVoidVolume())*(cell->info().dv()))) + m) * cell->info().invSumK - cell->info().p()) * relax + cell->info().p();
+					  }
+						
 					} else {
 					/// INCOMPRESSIBLE cell->info().p() =   - ( cell->info().dv() - m ) / ( n ) = ( -cell.info().dv() + m ) / n ;
 						cell->info().p() = (- (cell->info().dv() - m) * cell->info().invSumK - cell->info().p()) * relax + cell->info().p();

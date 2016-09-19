@@ -104,7 +104,8 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 		if (updateTriangulation || (ellapsedIter>(0.5*meshUpdateInterval) && backgroundCompleted)) {
 			if (debug) cerr<<"switch flow solver"<<endl;
 			if (useSolver==0) LOG_ERROR("background calculations not available for Gauss-Seidel");
-			if (fluidBulkModulus>0 || doInterpolate) solver->interpolate (solver->T[solver->currentTes], backgroundSolver->T[backgroundSolver->currentTes]);
+			//if (fluidBulkModulus>0 || doInterpolate) solver->interpolate (solver->T[solver->currentTes], backgroundSolver->T[backgroundSolver->currentTes]);
+			if (isCompressible || doInterpolate) solver->interpolate (solver->T[solver->currentTes], backgroundSolver->T[backgroundSolver->currentTes]);
 			solver=backgroundSolver;
 			backgroundSolver = shared_ptr<FlowSolver> (new FlowSolver);
 			if (metisForced) {backgroundSolver->eSolver.cholmod().nmethods=1; backgroundSolver->eSolver.cholmod().method[0].ordering=CHOLMOD_METIS;}
@@ -230,7 +231,8 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 	flow.minKdivKmean = minKdivKmean;
         flow.meanKStat = meanKStat;
         flow.permeabilityMap = permeabilityMap;
-        flow.fluidBulkModulus = fluidBulkModulus;
+        flow.fluidBulkModulus = fluidBulkModulus; // gases and other highly compressible fluids should use p() instead of fluidBulkModulus - done if isCompressible==true and !fluidBulkModulus>0.
+	flow.isCompressible = isCompressible;
 //         flow.tesselation().Clear();
         flow.tesselation().maxId=-1;
 	flow.blockedCells.clear();
@@ -287,7 +289,7 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
         boundaryConditions ( flow );
         flow.initializePressure ( pZero );
 	
-        if ( !first && !multithread && (useSolver==0 || fluidBulkModulus>0 || doInterpolate)) flow.interpolate ( flow.T[!flow.currentTes], flow.tesselation() );
+        if ( !first && !multithread && (useSolver==0 || isCompressible || doInterpolate)) flow.interpolate ( flow.T[!flow.currentTes], flow.tesselation() );
         if ( waveAction ) flow.applySinusoidalPressure ( flow.tesselation().Triangulation(), sineMagnitude, sineAverage, 30 );
 	else if (boundaryPressure.size()!=0) flow.applyUserDefinedPressure ( flow.tesselation().Triangulation(), boundaryXPos , boundaryPressure);
         if (normalLubrication || shearLubrication || viscousShear) flow.computeEdgesSurfaces();
@@ -419,7 +421,7 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 			case ( 3 ) : cell->info().volume() = volumeCellTripleFictious ( cell ); break;
 			default: break; 
 		}
-		if (flow.fluidBulkModulus>0) { cell->info().invVoidVolume() = 1 / ( std::abs(cell->info().volume()) - flow.volumeSolidPore(cell) ); }
+		if (flow.isCompressible) { cell->info().invVoidVolume() = 1 / ( std::abs(cell->info().volume()) - flow.volumeSolidPore(cell) ); }
 	}
 	if (debug) cout << "Volumes initialised." << endl;
 }

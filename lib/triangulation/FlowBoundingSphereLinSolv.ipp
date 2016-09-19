@@ -203,7 +203,12 @@ int FlowBoundingSphereLinSolv<_Tesselation,FlowType>::setLinearSystem(Real dt)
 				vs[T_nnz]=0;
 				for (int j=0;j<4;j++) if (!cell->neighbor(j)->info().blocked) vs[T_nnz]+= (cell->info().kNorm())[j];
 // 				vs[T_nnz] = (cell->info().kNorm())[0]+ (cell->info().kNorm())[1]+ (cell->info().kNorm())[2]+ (cell->info().kNorm())[3];
-				if (fluidBulkModulus>0) vs[T_nnz] += (1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()));
+				if (isCompressible && fluidBulkModulus>0){
+				  vs[T_nnz] += (1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()));
+				} else if (isCompressible && !(fluidBulkModulus>0)){
+				  // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+				  vs[T_nnz] += (1.f/(dt*cell->info().p()*cell->info().invVoidVolume()));
+				}
 				++T_nnz;
 			}
 			for (int j=0; j<4; j++) {
@@ -296,7 +301,12 @@ void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::copyCellsToGs (Real dt)
 	for (int ii=1; ii<=ncols; ii++){
 		gsP[ii]=T_cells[ii]->info().p();
 		gsdV[ii]= T_cells[ii]->info().dv();
-		if (fluidBulkModulus>0) { gsdV[ii] -= T_cells[ii]->info().p()/(fluidBulkModulus*dt*T_cells[ii]->info().invVoidVolume());}
+		if (isCompressible && fluidBulkModulus>0) { 
+		  gsdV[ii] -= T_cells[ii]->info().p()/(fluidBulkModulus*dt*T_cells[ii]->info().invVoidVolume());
+		} else if (isCompressible && !(fluidBulkModulus>0)) { 
+		  // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+		  gsdV[ii] -= 1/(dt*T_cells[ii]->info().invVoidVolume());
+		}
 	}
 }
 
@@ -308,7 +318,15 @@ void FlowBoundingSphereLinSolv<_Tesselation,FlowType>::copyCellsToLin (Real dt)
 {
 	for (int ii=1; ii<=ncols; ii++) {
 		T_bv[ii-1]=T_b[ii-1]-T_cells[ii]->info().dv();
-		if (fluidBulkModulus>0) T_bv[ii-1] += T_cells[ii]->info().p()/(fluidBulkModulus*dt*T_cells[ii]->info().invVoidVolume());}
+		if (isCompressible && fluidBulkModulus>0){
+		  T_bv[ii-1] += T_cells[ii]->info().p()/(fluidBulkModulus*dt*T_cells[ii]->info().invVoidVolume());
+		  
+		} else if (isCompressible && !(fluidBulkModulus>0)){
+		  // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+		  T_bv[ii-1] += 1/(dt*T_cells[ii]->info().invVoidVolume());
+		}
+	  
+	}
 }
 
 /// For Gauss Seidel, we need the full matrix
@@ -373,7 +391,12 @@ int FlowBoundingSphereLinSolv<_Tesselation,FlowType>::setLinearSystemFullGS(Real
 			gsP[cell->info().index]=cell->info().pression;
 			//Add diagonal term
 			double num = (cell->info().kNorm())[0]+ (cell->info().kNorm())[1]+ (cell->info().kNorm())[2]+ (cell->info().kNorm())[3];
-			if (fluidBulkModulus>0) num += (1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()));
+			if (isCompressible && fluidBulkModulus>0){
+			  num += (1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()));
+			} else if (isCompressible && !(fluidBulkModulus>0)){
+			  // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+			  num += (1.f/(dt*cell->info().p()*cell->info().invVoidVolume()));
+			}
 			fullAvalues[cell->info().index][4] = 1.f/num;
 			++T_nnz;
 			

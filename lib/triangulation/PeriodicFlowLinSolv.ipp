@@ -110,7 +110,15 @@ int PeriodicFlowLinSolv<_Tesselation>::setLinearSystem(Real dt)
 				js[T_nnz] = index;
 				vs[T_nnz] = (cInfo.kNorm())[0]+ (cInfo.kNorm())[1]+ (cInfo.kNorm())[2]+ (cInfo.kNorm())[3];
 				if (vs[T_nnz]<0) cerr<<"!!!! WTF !!!"<<endl;
-				if (fluidBulkModulus>0) vs[T_nnz] += (1.f/(dt*fluidBulkModulus*cInfo.invVoidVolume()));
+				if (isCompressible && fluidBulkModulus>0){
+				  // slightly compressible fluids can be given a fixed Bulk Modulus
+				  vs[T_nnz] += (1.f/(dt*fluidBulkModulus*cInfo.invVoidVolume()));
+				} else if (isCompressible && !fluidBulkModulus>0){
+				  if (cell->info().p()>0){
+				    vs[T_nnz] += (1.f/(dt*cell->info().p()*cInfo.invVoidVolume()));
+				    // gases and other highly compressible fluids should use p() instead of fluidBulkModulus
+				  }
+				}
 				T_nnz++;
 			}
 			for (int j=0; j<4; j++) {
@@ -201,7 +209,8 @@ int PeriodicFlowLinSolv<_Tesselation>::setLinearSystemFullGS(Real dt)
 			///Non-ordered cells
 			if (!cell->info().Pcondition && !cell->info().isGhost) {
 				//Add diagonal term
-				fullAvalues[cell->info().index][4] = 1.f/((cell->info().kNorm())[0]+ (cell->info().kNorm())[1]+ (cell->info().kNorm())[2]+ (cell->info().kNorm())[3] + (fluidBulkModulus>0? 1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()):0));
+				// In next line, pressure should be used instead of Bulk Modulus for highly compresible fluids like gases
+				fullAvalues[cell->info().index][4] = 1.f/((cell->info().kNorm())[0]+ (cell->info().kNorm())[1]+ (cell->info().kNorm())[2]+ (cell->info().kNorm())[3] + ((isCompressible && fluidBulkModulus>0)? 1.f/(dt*fluidBulkModulus*cell->info().invVoidVolume()):0)+ ((isCompressible && !fluidBulkModulus>0)? 1.f/(dt*cell->info().p()*cell->info().invVoidVolume()):0));
 				//DUMP
 				T_nnz++;
 				for (int j=0; j<4; j++) {

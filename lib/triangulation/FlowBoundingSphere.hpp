@@ -106,6 +106,7 @@ class FlowBoundingSphere : public Network<_Tesselation>
 
 		double viscosity;
 		double fluidBulkModulus;
+		bool isCompressible;
 		
 		void displayStatistics();
 		void initializePressure ( double pZero );
