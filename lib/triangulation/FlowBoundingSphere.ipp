@@ -691,7 +691,7 @@ vector<Constriction> FlowBoundingSphere<Tesselation>::getConstrictionsFull()
 		rn.push_back(normal[0]);
 		rn.push_back(normal[1]);
 		rn.push_back(normal[2]);
-		Constriction cons (pair<int,int>(f_it->first->info().index,f_it->first->neighbor(f_it->second)->info().index),rn);
+		Constriction cons (pair<int,int>(f_it->first->info().id,f_it->first->neighbor(f_it->second)->info().id),rn);
 		constrictions.push_back(cons);
 	}
 	return constrictions;
@@ -901,7 +901,7 @@ void FlowBoundingSphere<Tesselation>::gaussSeidel(Real dt)
 						} else {							
 						/// INCOMPRESSIBLE 
 							m += (cell->info().kNorm())[j2] * cell->neighbor(j2)->info().p();
-							if ( isinf(m) && j<10 ) cout << "(cell->info().kNorm())[j2] = " << (cell->info().kNorm())[j2] << " cell->neighbor(j2)->info().p() = " << cell->neighbor(j2)->info().p() << endl;
+							if ( std::isinf(m) && j<10 ) cout << "(cell->info().kNorm())[j2] = " << (cell->info().kNorm())[j2] << " cell->neighbor(j2)->info().p() = " << cell->neighbor(j2)->info().p() << endl;
 							if (j==0) n += (cell->info().kNorm())[j2];
 						}  
 					}

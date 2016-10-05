@@ -8,14 +8,17 @@
 
 #ifdef YADE_CGAL
 
-#include<pkg/dem/Shop.hpp>
-#include"TesselationWrapper.hpp"
-#include<lib/triangulation/Timer.h>
-#include<pkg/dem/SpherePack.hpp>
-#include<lib/pyutil/numpy.hpp>
+#include <pkg/dem/Shop.hpp>
+#include "TesselationWrapper.hpp"
+#include <lib/triangulation/Timer.h>
+#include <pkg/dem/SpherePack.hpp>
+#include <lib/pyutil/numpy_boost.hpp>
 
 YADE_PLUGIN((TesselationWrapper));
 CREATE_LOGGER(TesselationWrapper);
+
+// helper macro do assign Matrix3r values to subarrays
+#define MATRIX3R_TO_NUMPY(mat,arr) arr[0]=mat(0,0);arr[1]=mat(0,1);arr[2]=mat(0,2);arr[3]=mat(1,0);arr[4]=mat(1,1);arr[5]=mat(1,2);arr[6]=mat(2,0);arr[7]=mat(2,1);arr[8]=mat(2,2);
 
 //spatial sort traits to use with a pair of CGAL::sphere pointers and integer.
 //template<class _Triangulation>
@@ -70,11 +73,13 @@ void build_triangulation_with_ids(const shared_ptr<BodyContainer>& bodies, Tesse
 	int nonSpheres =0;
 	shared_ptr<Sphere> sph (new Sphere);
 	int Sph_Index = sph->getClassIndexStatic();
+	Scene* scene = Omega::instance().getScene().get();
 	for (; bi!=biEnd ; ++bi) {
 		if ( (*bi)->shape->getClassIndex() ==  Sph_Index ) {
-// 		if ((*bi)->isDynamic()) { //then it is a sphere (not a wall) FIXME : need test if isSphere
 			const Sphere* s = YADE_CAST<Sphere*> ((*bi)->shape.get());
-			const Vector3r& pos = (*bi)->state->pos;
+//FIXME: is the scene periodicity verification useful in the next line ? Tesselation seems to work in both periodic and non-periodic conditions with "scene->cell->wrapShearedPt((*bi)->state->pos)". I keep the verification to be consistent with all other uses of "wrapShearedPt" function.
+			const Vector3r& pos = scene->isPeriodic	? scene->cell->wrapShearedPt((*bi)->state->pos)
+								: (*bi)->state->pos;
 			const Real rad = s->radius;
 			CGT::Sphere sp(CGT::Point(pos[0],pos[1],pos[2]),rad*rad);
 			spheres.push_back(sp);
@@ -246,7 +251,7 @@ void TesselationWrapper::addBoundingPlanes(double pminx, double pmaxx, double pm
 		Tes->vertexHandles[freeIds[0]]=Tes->insert(0.5*(pminx+pmaxx),pminy-far*(pmaxx-pminx),0.5*(pmaxz+pminz),far*(pmaxx-pminx)+thickness,freeIds[0],true);
 		Tes->vertexHandles[freeIds[1]]=Tes->insert(0.5*(pminx+pmaxx), pmaxy+far*(pmaxx-pminx),0.5*(pmaxz+pminz),far*(pmaxx-pminx)+thickness, freeIds[1], true);
 		Tes->vertexHandles[freeIds[2]]=Tes->insert(pminx-far*(pmaxy-pminy), 0.5*(pmaxy+pminy), 0.5*(pmaxz+pminz), far*(pmaxy-pminy)+thickness, freeIds[2], true);
-		Tes->vertexHandles[freeIds[3]]=Tes->insert(pmaxx+far*(pmaxx-pminy), 0.5*(pmaxy+pminy), 0.5*(pmaxz+pminz), far*(pmaxy-pminy)+thickness, freeIds[3], true);
+		Tes->vertexHandles[freeIds[3]]=Tes->insert(pmaxx+far*(pmaxy-pminy), 0.5*(pmaxy+pminy), 0.5*(pmaxz+pminz), far*(pmaxy-pminy)+thickness, freeIds[3], true);
 		Tes->vertexHandles[freeIds[4]]=Tes->insert(0.5*(pminx+pmaxx), 0.5*(pmaxy+pminy), pminz-far*(pmaxy-pminy), far*(pmaxy-pminy)+thickness, freeIds[4], true);
 		Tes->vertexHandles[freeIds[5]]=Tes->insert(0.5*(pminx+pmaxx), 0.5*(pmaxy+pminy), pmaxz+far*(pmaxy-pminy), far*(pmaxy-pminy)+thickness, freeIds[5], true);
 		
