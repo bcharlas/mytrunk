@@ -34,7 +34,7 @@ versions, shipped with particular distribution.
 
 The Git-repository for packaging stuff is available on `GitHub <https://github.com/yade/yadedaily/>`_. 
 Each branch corresponds to one distribution, e.g., trusty, jessie etc.
-The scripts for building all of this stuff are `here <https://github.com/yade/trunk/tree/master/scripts/ppa>`_. 
+The scripts for building all of this stuff are `here <https://github.com/yade/trunk/tree/master/scripts/ppa>`__. 
 It uses "pbuilder" to build packages, so all packages are built in a clean environment.
 
 If you do not need ``yadedaily``-package any more, just remove the
@@ -87,7 +87,7 @@ easy-to-fix bugs), but generally they are more stable than the trunk.
 #. The development version (``trunk``) can be obtained from the `code repository <https://github.com/yade/>`_ at GitHub.
 
 We use `GIT <http://git-scm.com/>`_ (the ``git`` command) for code 
-management (install the ``git`` package on your system and create a `GitHub account <https://github.com/join/>`_)::
+management (install the ``git`` package on your system and create a `GitHub account <https://github.com/join/>`__)::
 
 		git clone git@github.com:yade/trunk.git
 
@@ -98,7 +98,7 @@ Alternatively, a read-only checkout is possible via https without a GitHub accou
 
 		git clone https://github.com/yade/trunk.git
    
-For those behind a firewall, you can download the sources from our `GitHub <https://github.com/yade>`_ repository as compressed archive.
+For those behind a firewall, you can download the sources from our `GitHub <https://github.com/yade>`__ repository as compressed archive.
 
 Release and trunk sources are compiled in exactly the same way. In order to get notifications about changes
 to the truck (i.e., ``commits``), use `watch option on GitHub <https://help.github.com/articles/watching-repositories/>`_.
@@ -111,7 +111,7 @@ Some of them are only optional. The last ones are only relevant for using the fl
 
 * `cmake <http://www.cmake.org/>`_ build system
 * `gcc <http://www.gcc.gnu.org>`_ compiler (g++); other compilers will not work; you need g++>=4.2 for openMP support
-* `boost <http://www.boost.org/>`_ 1.35 or later
+* `boost <http://www.boost.org/>`_ 1.47 or later
 * `Qt <http://www.qt.io/>`_ library
 * `freeglut3 <http://freeglut.sourceforge.net>`_
 * `libQGLViewer <http://www.libqglviewer.com>`_
@@ -143,8 +143,8 @@ need root privileges.
 		sudo apt-get install cmake git freeglut3-dev libloki-dev \
 		libboost-all-dev fakeroot dpkg-dev build-essential g++ \
 		python-dev ipython python-matplotlib libsqlite3-dev python-numpy python-tk gnuplot \
-		libgts-dev python-pygraphviz libvtk5-dev python-scientific libeigen3-dev \
-		python-xlib python-qt4 pyqt4-dev-tools gtk2-engines-pixbuf python-argparse \
+		libgts-dev python-pygraphviz libvtk6-dev python-numpy libeigen3-dev \
+		python-xlib python-pyqt5 pyqt5-dev-tools python-pyqt5.qtwebkit gtk2-engines-pixbuf python-argparse \
 		libqglviewer-dev python-imaging libjs-jquery python-sphinx python-git python-bibtex \
 		libxmu-dev libxi-dev libcgal-dev help2man libbz2-dev zlib1g-dev python-minieigen
 		
@@ -239,20 +239,10 @@ The following options are available:
 	* runtimePREFIX: used for packaging, when install directory is not the same as runtime directory (/usr/local by default)
 	* CHUNKSIZE: specifiy the chunk size if you want several sources to be compiled at once. Increases compilation speed but RAM-consumption during compilation as well (1 by default)
 	* VECTORIZE: enables vectorization and alignment in Eigen3 library, experimental (OFF by default)
-	* USE_QT5: use QT5 for GUI, experimental (OFF by default)
+	* USE_QT5: use QT5 for GUI, experimental (ON by default)
 
 For using more extended parameters of cmake, please follow the corresponding
 documentation on `https://cmake.org/documentation <https://cmake.org/documentation/>`_. 
-
-.. warning:: To provide Qt4->Qt5 migration one needs to provide an additional option USE_QT5.
- This option should be ON or OFF according to the Qt version, which was used
- to compile libQGLViewer. On Debian/Ubuntu operating systems libQGLViewer
- of version 2.6.3 and higher are compiled against Qt5 (for other operating systems
- refer to the package archive of your distribution), so if you are using
- such version, please switch this option ON. Otherwise, if you mix Qt-versions a
- ``Segmentation fault`` will appear just after Yade is started. To provide
- necessary build dependencies for Qt5, install ``python-pyqt5 pyqt5-dev-tools``
- instead of ``python-qt4 pyqt4-dev-tools``.
 
 If cmake finishes without errors, you will see all enabled 
 and disabled options at the end. Then start the actual compilation process with::
@@ -304,5 +294,5 @@ Yubuntu
 
 If you are not running Ubuntu nor Debian, there is a way to create a Yubuntu `live-usb <http://en.wikipedia.org/wiki/Live_USB>`_ on any usb mass-storage device (minimum recommended size is 5GB). It is a way to make a bootable usb-key with a preinstalled minimalist operating system (Xubuntu), including Yadedaily and Paraview.
 
-More informations about this alternative are available `here <http://geo.hmg.inpg.fr/~chareyre/pubs/yubuntu/>`_ (see the README file first).
+More informations about this alternative are available `here <http://people.3sr-grenoble.fr/users/bchareyre/pubs/yubuntu/>`_ (see the README file first).
 

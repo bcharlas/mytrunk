@@ -34,7 +34,7 @@ def saveVars(mark='',loadNow=True,**kw):
 		(1, 2, 3)
 
 	those variables will be save in the .xml file, when the simulation itself is saved. To recover those variables once the .xml is loaded again, use
-	``loadVars('something')``and they will be defined in the yade.params.\ *mark* module. The *loadNow* parameter calls :yref:`yade.utils.loadVars`
+	``loadVars('something')`` and they will be defined in the yade.params.\ *mark* module. The *loadNow* parameter calls :yref:`yade.utils.loadVars`
 	after saving automatically. If 'something' already exists, given variables will be inserted.
 	"""
 	import cPickle
@@ -277,7 +277,7 @@ def tetraPoly(vertices,dynamic=True,fixed=False,wire=True,color=None,highlight=F
 	inertia = b.shape.GetInertia()
 	center = b.shape.GetCentroid()
 	_commonBodySetup(b,volume,inertia,material,noBound=noBound,pos=center,fixed=fixed)
-	b.aspherical=False
+	b.aspherical=True
 	b.state.ori = b.shape.GetOri()
 	b.mask=mask
 	b.chain=chain
@@ -323,7 +323,7 @@ def polyhedron(vertices,dynamic=True,fixed=False,wire=True,color=None,highlight=
 	inertia = b.shape.GetInertia()
 	center = b.shape.GetCentroid()
 	_commonBodySetup(b,volume,inertia,material,noBound=noBound,pos=center,fixed=fixed)
-	b.aspherical=False
+	b.aspherical=True
 	b.state.ori = b.shape.GetOri()
 	b.mask=mask
 	b.chain=chain
@@ -792,8 +792,7 @@ def readParamsFromTable(tableFileLine=None,noTableOk=True,unknownOk=False,**kw):
 
 	All parameters (default as well as settable) are saved using :yref:`yade.utils.saveVars`\ ``('table')``.
 
-	:param tableFile: text file (with one value per blank-separated columns)
-	:param int tableLine: number of line where to get the values from
+	:param tableFileLine: string attribute to define which line number (as seen in a text editor) from wich text file (with one value per blank-separated columns) to get the values from. A ':' should appear between the two informations, e.g. 'file.table:4' to read the 4th line from file.table file
 	:param bool noTableOk: if False, raise exception if the file cannot be open; use default values otherwise
 	:param bool unknownOk: do not raise exception if unknown column name is found in the file, and assign it as well
 	:return: number of assigned parameters

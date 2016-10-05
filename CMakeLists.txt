@@ -23,7 +23,7 @@
 #  runtimePREFIX: used for packaging, when install directory is not the same is runtime directory (/usr/local by default)
 #  CHUNKSIZE: set >1, if you want several sources to be compiled at once. Increases compilation speed and RAM-consumption during it (1 by default)
 #  VECTORIZE: enables vectorization and alignment in Eigen3 library, experimental (OFF by default)
-#  USE_QT5: use QT5 for GUI, experimental (OFF by default)
+#  USE_QT5: use QT5 for GUI (ON by default)
 
 project(Yade C CXX)
 cmake_minimum_required(VERSION 2.8.11)
@@ -43,6 +43,7 @@ INCLUDE(FindNumPy)
 INCLUDE(FindLoki)
 INCLUDE(FindPythonModule)
 INCLUDE(GNUInstallDirs)
+
 
 INCLUDE_DIRECTORIES (${CMAKE_SOURCE_DIR})
 
@@ -72,14 +73,14 @@ ELSE()
   ENDIF()
 ENDIF()
 
-SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC -O2 --param=ssp-buffer-size=4 -Wformat -Wformat-security -Werror=format-security -Wall -std=c++0x")
+SET(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -fPIC -O2 --param=ssp-buffer-size=4 -Wformat -Wformat-security -Werror=format-security -Wall -std=c++11 ")
 
 IF (DEBUG)
   SET(CMAKE_VERBOSE_MAKEFILE 1)
   SET(CMAKE_BUILD_TYPE Debug)
   ADD_DEFINITIONS("-DYADE_DEBUG -g")
 ELSE (DEBUG)
-  ADD_DEFINITIONS(${CMAKE_CXX_FLAGS_RELEASE})
+  ADD_DEFINITIONS("-DNDEBUG")
 ENDIF (DEBUG)
 
 #===========================================================
@@ -131,7 +132,8 @@ OPTION(ENABLE_LIQMIGRATION "Enable liquid control (very experimental), see [Mani
 OPTION(ENABLE_MASK_ARBITRARY "Enable arbitrary precision of bitmask variables (only Body::groupMask yet implemented) (experimental). Use -DMASK_ARBITRARY_SIZE=int to set number of used bits (256 by default)" OFF)
 OPTION(ENABLE_PROFILING "Enable profiling, e.g. shows some more metrics, which can define bottlenecks of the code (OFF by default)" OFF)
 OPTION(ENABLE_POTENTIAL_PARTICLES "Enable potential particles" OFF)
-OPTION(USE_QT5 "USE Qt5 for GUI" OFF)
+OPTION(USE_QT5 "USE Qt5 for GUI" ON)
+OPTION(ENABLE_POTENTIAL_BLOCKS "Enable PotentialBlocks" OFF)
 
 #===========================================================
 # Use Eigen3 by default
@@ -169,7 +171,7 @@ ENDIF((Boost_MAJOR_VERSION EQUAL 1) OR (Boost_MAJOR_VERSION GREATER 1) AND
      ((Boost_MINOR_VERSION EQUAL 53) OR (Boost_MINOR_VERSION GREATER 53)))
 #===========================================================
 IF(ENABLE_VTK)
-  FIND_PACKAGE(VTK COMPONENTS vtkCommonCore vtkIOImage vtkIOXML)
+  FIND_PACKAGE(VTK COMPONENTS vtkCommonCore vtkIOImage vtkIOXML vtkFiltersCore vtkImagingCore vtkRenderingCore vtkImagingGeneral vtkImagingHybrid)
   IF(VTK_FOUND)
     INCLUDE_DIRECTORIES(${VTK_INCLUDE_DIRS})
     LINK_DIRECTORIES( ${VTK_LIBRARY_DIRS} )
@@ -223,9 +225,9 @@ IF(ENABLE_GUI)
   FIND_PACKAGE(OpenGL)
   FIND_PACKAGE(GLUT)
   FIND_PACKAGE(glib2)
-  FIND_PACKAGE(QGLVIEWER)
     
   IF(USE_QT5)
+    FIND_PACKAGE(QGLVIEWER-qt5 REQUIRED)
     FIND_PACKAGE(Qt5 CONFIG REQUIRED Widgets Xml OpenGL)
     SET(CMAKE_AUTOMOC ON)
     FIND_PACKAGE(Qt5Widgets)
@@ -242,6 +244,7 @@ IF(ENABLE_GUI)
       SET(ENABLE_GUI OFF)
     ENDIF(Qt5Widgets_FOUND AND OPENGL_FOUND AND GLUT_FOUND AND GLIB2_FOUND AND QGLVIEWER_FOUND)
   ELSE(USE_QT5)   # Use Qt4
+    FIND_PACKAGE(QGLVIEWER-qt4 REQUIRED)
     FIND_PACKAGE(Qt4 COMPONENTS QtCore QtGui QtOpenGL)
     IF(QT4_FOUND AND OPENGL_FOUND AND GLUT_FOUND AND GLIB2_FOUND AND QGLVIEWER_FOUND)
       SET(GUI_LIBS ${GLUT_LIBRARY} ${OPENGL_LIBRARY} ${QGLVIEWER_LIBRARIES})
@@ -284,6 +287,8 @@ IF(ENABLE_CGAL)
     SET(LINKLIBS  "${LINKLIBS};${CGAL_LIBRARIES};${GMP_LIBRARIES};${GMPXX_LIBRARIES};")
     MESSAGE(STATUS "Found CGAL")
     SET(CONFIGURED_FEATS "${CONFIGURED_FEATS} CGAL")
+    
+    ADD_DEFINITIONS("-DCGAL_DISABLE_ROUNDING_MATH_CHECK -frounding-math")
 
     IF(ENABLE_PFVFLOW)
       SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DFLOW_ENGINE")
@@ -411,6 +416,30 @@ ELSE(ENABLE_POTENTIAL_PARTICLES)
 ENDIF(ENABLE_POTENTIAL_PARTICLES)
 #===========================================================
 
+
+#===========================================================
+IF(ENABLE_POTENTIAL_BLOCKS)  
+  INCLUDE(FindCLP)
+  FIND_PACKAGE(OpenBlas REQUIRED)
+  FIND_PACKAGE(LAPACK REQUIRED)
+  IF(CLP_FOUND AND OPENBLAS_FOUND AND LAPACK_FOUND) 
+    ADD_DEFINITIONS("-DYADE_POTENTIAL_BLOCKS")
+    INCLUDE_DIRECTORIES(${CLP_INCLUDE_DIR} ${CLP2_INCLUDE_DIR} )
+    SET(LINKLIBS  "${LINKLIBS};${CLP_LIBRARY};${CLP2_LIBRARY};${CLP3_LIBRARY};${OPENBLAS_LIBRARY};${LAPACK_LIBRARY}")
+    MESSAGE(STATUS "Found CLP")
+    SET(CONFIGURED_FEATS "${CONFIGURED_FEATS} PotentialBlocks")
+  ELSE(CLP_FOUND AND OPENBLAS_FOUND AND LAPACK_FOUND) 
+    MESSAGE(STATUS "CLP NOT found")
+    SET(DISABLED_FEATS "${DISABLED_FEATS} PotentialBlocks")
+    SET(ENABLE_POTENTIAL_BLOCKS OFF)
+  ENDIF(CLP_FOUND AND OPENBLAS_FOUND AND LAPACK_FOUND) 
+ELSE(ENABLE_POTENTIAL_BLOCKS)  
+  SET(DISABLED_FEATS "${DISABLED_FEATS} PotentialBlocks")
+ENDIF(ENABLE_POTENTIAL_BLOCKS)  
+#===========================================================
+
+
+
 IF (INSTALL_PREFIX)
   SET(CMAKE_INSTALL_PREFIX ${INSTALL_PREFIX})
   MESSAGE(WARNING "Use CMAKE_INSTALL_PREFIX option instead of INSTALL_PREFIX! It will be removed soon.")
@@ -499,13 +528,13 @@ SET_TARGET_PROPERTIES(yade  PROPERTIES LINK_FLAGS "-Wl,--as-needed" )
 TARGET_LINK_LIBRARIES(boot yade)
 
 IF(ENABLE_VTK)
-  IF(${VTK_MAJOR_VERSION} EQUAL 6)
+  IF(${VTK_MAJOR_VERSION} GREATER 5)
     TARGET_LINK_LIBRARIES(yade ${VTK_LIBRARIES})
     ADD_DEFINITIONS("-DYADE_VTK6")
-    MESSAGE(STATUS "VTK version 6 is found")
-  ELSE(${VTK_MAJOR_VERSION} EQUAL 6)
+    MESSAGE(STATUS "VTK version >5 is found")
+  ELSE(${VTK_MAJOR_VERSION} GREATER 5)
     TARGET_LINK_LIBRARIES(yade vtkHybrid)
-  ENDIF(${VTK_MAJOR_VERSION} EQUAL 6)
+  ENDIF(${VTK_MAJOR_VERSION} GREATER 5)
 ENDIF(ENABLE_VTK)
 IF(ENABLE_GUI)
   TARGET_LINK_LIBRARIES(yade _GLViewer ${GUI_LIBS})
@@ -622,3 +651,5 @@ ADD_CUSTOM_COMMAND(
                   DEPENDS ${YADE_EXEC_PATH}/yade${SUFFIX}
                   )
 #===========================================================
+
+
