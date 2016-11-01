@@ -15,6 +15,7 @@
 #include <core/Omega.hpp>
 #include <core/Scene.hpp>
 #include <lib/base/Math.hpp>
+#include <pkg/common/Sphere.hpp>
 
 YADE_PLUGIN((Law2_ScGeom_CapillaryPhys_Capillarity));
 
@@ -92,16 +93,17 @@ void Law2_ScGeom_CapillaryPhys_Capillarity::action()
 			unsigned int id1 = interaction->getId1();
 			unsigned int id2 = interaction->getId2();
 
-			/// interaction geometry search (this test is to compute capillarity only between spheres (probably a better way to do that)
-			int geometryIndex1 = (*bodies)[id1]->shape->getClassIndex(); // !!!
-			int geometryIndex2 = (*bodies)[id2]->shape->getClassIndex();
-			if (!(geometryIndex1 == geometryIndex2)) continue;
-
 			/// definition of interacting objects (not necessarily in contact)
 			ScGeom* currentContactGeometry = static_cast<ScGeom*>(interaction->geom.get());
+			
+			/// test of interacting bodies geometries since capillarity will be computed between spheres only
+			int geometryIndex1 = (*bodies)[id1]->shape->getClassIndex();
+			int geometryIndex2 = (*bodies)[id2]->shape->getClassIndex();
+			if ( (geometryIndex1 != geometryIndex2) || (geometryIndex1!=Sphere::getClassIndexStatic()) ) { // such interactions won't have a meniscus
+				if(currentContactGeometry->penetrationDepth < 0) // thus we will ask for the interaction to be erased in this distant case, as we do w. sphere-sphere interactions below:
+					scene->interactions->requestErase(interaction);
+				continue;}
 
-			/// Capillary components definition:
-			Real liquidTension = surfaceTension;
 
 			/// Interacting Grains:
 			// If you want to define a ratio between YADE sphere size and real sphere size
@@ -128,8 +130,8 @@ void Law2_ScGeom_CapillaryPhys_Capillarity::action()
 
 			/// Suction (Capillary pressure):
 			Real Pinterpol = 0;
-			if (!hertzOn) Pinterpol = cundallContactPhysics->isBroken ? 0 : capillaryPressure*(R2/liquidTension);
-			else Pinterpol = mindlinContactPhysics->isBroken ? 0 : capillaryPressure*(R2/liquidTension);
+			if (!hertzOn) Pinterpol = cundallContactPhysics->isBroken ? 0 : capillaryPressure*(R2/surfaceTension);
+			else Pinterpol = mindlinContactPhysics->isBroken ? 0 : capillaryPressure*(R2/surfaceTension);
 			if (!hertzOn) cundallContactPhysics->capillaryPressure = capillaryPressure;
 			else mindlinContactPhysics->capillaryPressure = capillaryPressure;
 
@@ -149,7 +151,7 @@ void Law2_ScGeom_CapillaryPhys_Capillarity::action()
 				}
 				/// capillary adhesion force
 				Real Finterpol = solution.F;
-				Vector3r fCap = - Finterpol*(2*Mathr::PI*(R2/alpha)*liquidTension)*currentContactGeometry->normal;
+				Vector3r fCap = - Finterpol*(2*Mathr::PI*(R2/alpha)*surfaceTension)*currentContactGeometry->normal;
 				if (!hertzOn) cundallContactPhysics->fCap = fCap;
 				else mindlinContactPhysics->fCap = fCap;
 				/// meniscus volume
