@@ -9,6 +9,8 @@ Created on Wed Jan 13 10:55:38 2016
 from yade.pack import *
 import numpy as np
 
+
+
 #global heatBodies
 heatBodies=[] # bodies concerned by the heat exchange
 #
@@ -135,23 +137,57 @@ def heatConductivity():
                             m1=O.bodies[i.id1].state.mass
                             m2=O.bodies[i.id2].state.mass
                             #
+                            Cp1=listCp[index1]
+                            Cp2=listCp[index2]
+                            #
                             if r1==0.0:
-                                dij=2*np.sqrt(r2*pene-pene**2/4.)
-                                #dQ = -L2 * g_pi * r2 * pene * (T1-T2)/r2
+                                rij=np.sqrt(r2**2-pene**2)#np.sqrt(r2*pene-pene**2/4.)
+                                #
+                                L1=0.
+                                #L2=r2-pene
                             elif r2== 0.:
-                                dij=2*np.sqrt(r1*pene-pene**2/4.)
+                                rij=np.sqrt(r1**2-pene**2)#np.sqrt(r1*pene-pene**2/4.)
+                                #
+                                L1=r1-pene
+                                #L2=0.
                                 #dQ = -L1* g_pi * r1 * pene * (T1-T2)/r1
                             else:
-                                dij = 2*np.sqrt(0.5*(r1+r2)*pene-pene**2/4)
+                                L1=(r1**2-r2**2+(r1+r2-pene)**2)/(2*(r1+r2-pene))
+                                #L2=(r2**2-r2**2+(r1+r2-pene)**2)/(2*(r1+r2-pene))
+                                #
+                                rij=sqrt(r1**2-L1**2)# Tsory et al.
+                                #rij = np.sqrt(0.5*(r1+r2)*pene-pene**2/4)
                                 #dQ = L1*L2 / ( (r1-pene/2.)*L2 + (r2-pene/2.)*L1) * g_pi * min(r1,r2) * pene * (T1-T2)
                             #
-                            dQ = surfaceRatio* 1./4. * dij**2 * np.pi / ((r1/k1+r2/k2)) * (T1-T2) 
                             #
-                            if (i.id1 not in isoThermalList) and (abs(O.dt *dQ/(m1*listCp[index1])) < abs(T1-T2)):
-                                incBodyTemp[index1]-=O.dt *dQ/(O.bodies[i.id1].state.mass*listCp[index1])  * O.bodies[i.id2].state.mass /(O.bodies[i.id1].state.mass+O.bodies[i.id2].state.mass)
-                            if (i.id2 not in isoThermalList) and (abs(O.dt *dQ/(m2*listCp[index2])) < abs(T1-T2)):
-                                incBodyTemp[index2]+=O.dt *dQ/(O.bodies[i.id2].state.mass*listCp[index2]) * O.bodies[i.id2].state.mass /(O.bodies[i.id1].state.mass+O.bodies[i.id2].state.mass)
-        '''    
-        for bIndex in range(len(bodyTemp)):
-            bodyTemp[bIndex] += incBodyTemp[bIndex]
-        '''
+                            Tc= (T1*m1*Cp1 + T2*m2*Cp2)/(m1*Cp1 + m2*Cp2) # average temperature
+                            
+                            #dQ = surfaceRatio* dij**2 * np.pi / ((r1/k1+r2/k2)) * (T1-T2) * 2 * min(m1*Cp1,m2*Cp2)/(m1*Cp1 + m2*Cp2)
+                            dQ = surfaceRatio* 4. * rij / ((1/k1+1/k2)) * (T1-T2) # Tsory et al.
+                            #dQ = k1*k2 / ((r1-pene/2)*k2 +(r2-pene/2)*k1)* np.pi * 1/4 * dij**2* (T1-T2) * 2 * min(m1*Cp1,m2*Cp2)/(m1*Cp1 + m2*Cp2)
+                            #
+                            dT1=-O.dt *dQ/(m1*Cp1)
+                            dT2=O.dt *dQ/(m2*Cp2)
+                            #
+                            if (abs(dT1) < abs(T1-Tc)) and (abs(dT2) < abs(Tc-T2)):
+                                incBodyTemp[index1]+=dT1 
+                                incBodyTemp[index2]+=dT2 
+                            
+                            
+                            '''
+                            if (abs(incBodyTemp[index1]+dT1) < abs(T1-Tc)) and (abs(incBodyTemp[index2]+dT2) < abs(Tc-T2)):
+                                incBodyTemp[index1]+=dT1 
+                                incBodyTemp[index2]+=dT2 
+                            
+                            else:
+                                coef1=1.
+                                coef2=1.
+                                #
+                                if(abs(incBodyTemp[index1]+dT1) > abs(T1-Tc)):
+                                    coef1=abs(T1-Tc)/abs(incBodyTemp[index1]+dT1)
+                                if(abs(incBodyTemp[index2]+dT2) > abs(Tc-T2)):
+                                    coef2=abs(Tc-T2)/abs(incBodyTemp[index2]+dT2)
+                                coef=min(coef1,coef2)
+                                incBodyTemp[index1]=(incBodyTemp[index1]+dT1)*coef 
+                                incBodyTemp[index2]=(incBodyTemp[index2]+dT2)*coef
+                            '''

@@ -135,7 +135,7 @@ def sorption(flow):
     for i in range(flow.nCells()):
         Tc=cellHeat.cellTemp[i]
         pc=flow.getCellPressure(i)
-        Vc=flow.volumeVoidPore(i)
+        Vc=flow.volumeVoidPore(i)*np.sign(flow.volumePore(i))# is it necessary?
         #
         if Vc>0. and Tc>0. and pc>0.:
             # HERE INSERT A LIST OF 4 "r" so that the r will be adjusted if it is too big
@@ -151,66 +151,45 @@ def sorption(flow):
                     #
                     Tb = bodyHeat.bodyTemp[bodyHeat.heatBodies.index(b)]
                     #
-                    peq=pc# to be checked
+                    #peq=p0# to be checked
                     
-                    if Tb> DH_surf/DS:
-                        Rb = O.bodies[b].shape.radius
-                        #
-                        Ksurf=-DH_surf/R/Tb + DS/R 
-                        peq=(np.exp(Ksurf) * p0)
-                        p_rel=(pc-peq)/peq
-                        
-                        if Ksurf<0:
-                            print('error with Ksurf: ' + str(Ksurf))
-                            break
-                        #
-                        ###
-                        '''
-                        mu = 30 # Hz
-                        D_E_in=10.0*1e6# mJ/mol
-                        D_E_tot=41.4*1e6#mJ/mol
-                        D_E_surf=DH_surf
-                        D_E_out=D_E_tot-D_E_surf+D_E_in
-                        gamma=100.
-                        #
-                        kp=mu*np.exp(-D_E_in/(R*T))
-                        theta = Ksurf*pc/(1+Ksurf*pc)#adsorption reaction from Langmuir adsorption
-                        nS=bodyMass0[sorpBodies.index(b)](1- 0.8594*s)/M_0 * 8 # number of free sites in moles
-                        '''
-                        ###
-                        #
-                        r_a=k_a*np.exp(-E_a/(R*Tb))*(1-s)*p_rel # absorption reaction rate
-                        r_d=k_d*np.exp(-E_d/(R*Tb))*(s)*p_rel # desorption reaction rate
-                        #
-                        #r=(r_a-r_d) * bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * Vc/refVol * 10. #overal reaction rate
+                    #if Tb==Tb:#< DH_surf/DS:# why this condition??
+                    Rb = O.bodies[b].shape.radius
+                    #
+                    Ksurf=-DH_surf/R/Tb + DS/R 
+                    peq=(np.exp(Ksurf) * p0)
+                    p_rel=(pc-peq)/peq
+                    
+                    if Ksurf<0:
+                        print('error with Ksurf: ' + str(Ksurf))
+                        break
+                    #
+                    r_a=k_a*np.exp(-E_a/(R*Tb))*(1-s)*p_rel # absorption reaction rate
+                    r_d=k_d*np.exp(-E_d/(R*Tb))*(s)*p_rel # desorption reaction rate
+                    #
+                    #r=(r_a-r_d) * bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * Vc/refVol * 10. #overal reaction rate
 
-                        if p_rel >0.:
-                            r= r_a 
-                        else:
-                            r= r_d
-                        
-                        
-                        r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100.
-                        
-                        if r>0 and (((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)]) +s < s_max)) and ( ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/k_m/bodyMass0[sorpBodies.index(b)] +s>0.)):
-                            #print (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)])
-                            r_List.append((b,r))
-                            dP -= r*O.dt * R * Tc / Vc # incP
+                    if p_rel >0.:
+                        r= r_a 
+                    else:
+                        r= r_d
+                    
+                    
+                    r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) #* mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100.
+                    
+                    if r>0 and (((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)]) +s < s_max)) and ( ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/k_m/bodyMass0[sorpBodies.index(b)] +s>0.)):
+                        #print (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)])
+                        r_List.append((b,r))
+                        dP -= r*O.dt * R * Tc / Vc # incP
                         
 
             
             ratioP = 1.
             if (pc + cellHeat.incP[i] + dP < max(peq,0.)) and dP < 0.:# correction if pressure decrement is too big
                 if pc + cellHeat.incP[i]< max(peq,0.):
-                    ratioP= 0.
+                    ratioP= 0.# why zero
                 else:
                     ratioP = (peq-(pc + cellHeat.incP[i])) / dP
-                    print('ratioP ' +str(ratioP))
-                    print('pc ' +str(pc))
-                    print('cellHeat.incP[i] ' +str(cellHeat.incP[i]))
-                    print('dP ' +str(dP))
-                    print('pc + cellHeat.incP[i] + ratioP*dP ' +str(pc + cellHeat.incP[i] + ratioP*dP))
-                    print
             #
             ratioP = ratioP
             cellHeat.incP[i] += ratioP * dP
@@ -221,7 +200,7 @@ def sorption(flow):
             for i in range(len(r_List)):
                 if r_List[i][0] in sorpBodies:
                     incBodySorp[sorpBodies.index(r_List[i][0])] += ratioP *r_List[i][1] * M_NH3 * O.dt # MASS increment of the body
-                    dQ = ratioP * DH_surf *r_List[i][1] * O.dt
+                    dQ = ratioP * DH_surf *r_List[i][1] * O.dt/R
                     bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(r_List[i][0])] += dQ / (O.bodies[r_List[i][0]].state.mass * bodyHeat.listCp[bodyHeat.heatBodies.index(r_List[i][0])]) #inc Body Temperature
             
                     
