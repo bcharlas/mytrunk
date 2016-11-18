@@ -75,7 +75,7 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 	Vector3r force;
 	Vector3r torque;
         FiniteVerticesIterator verticesEnd = solver->T[solver->currentTes].Triangulation().finite_vertices_end();
-	int maxBodyId = scene->bodies->size();
+	int bodiesLength = scene->bodies->size();
         for ( FiniteVerticesIterator vIt = solver->T[solver->currentTes].Triangulation().finite_vertices_begin(); vIt !=  verticesEnd; vIt++ ) {
 		int vId = vIt->info().id();
 		force = pressureForce ? Vector3r ( vIt->info().forces[0],vIt->info().forces[1],vIt->info().forces[2] ): Vector3r(0,0,0);
@@ -88,7 +88,7 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 		}
 		if (twistTorque) torque = torque + solver->twistLubricationTorques[vId];
 		if (normalLubrication) force = force + solver-> normalLubricationForce[vId];
-		if (vIt->info().id() < maxBodyId) {
+		if (vIt->info().id() < bodiesLength) {
 			scene->forces.addForce ( vId, force);
 			scene->forces.addTorque ( vId, torque);}
         }
@@ -338,8 +338,11 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
                         flow.zMax = max ( flow.zMax, z+rad );
                 }
         }
-	//FIXME idOffset must be set correctly, not the case here (always 0), then we need walls first or it will fail
-        idOffset = flow.tesselation().maxId+1;
+	//set idOffset if<0, in that case overwrite wallIds and assign values out of range scene->bodies
+        if (idOffset<0) {
+	  idOffset = scene->bodies->size();
+	  for (int i=0; i<6; ++i){wallIds[i]=i+idOffset;}
+	}
         flow.idOffset = idOffset;
         flow.sectionArea = ( flow.xMax - flow.xMin ) * ( flow.zMax-flow.zMin );
         flow.vTotal = ( flow.xMax-flow.xMin ) * ( flow.yMax-flow.yMin ) * ( flow.zMax-flow.zMin );
@@ -452,7 +455,7 @@ void TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
                                 CGT::CVector branch = cell->vertex ( facetVertices[i][0] )->point() - cell->info();
                                 pos_av_facet = ( CGT::Point ) cell->info() + ( branch*Surfk ) *Surfk;
                                 volume_facet_translation += Vel_av*cell->info().facetSurfaces[i];
-                                cell->info().averageVelocity() = cell->info().averageVelocity() - volume_facet_translation/cell->info().volume() * ( pos_av_facet-CGAL::ORIGIN );
+                                cell->info().averageVelocity() = cell->info().averageVelocity() - volume_facet_translation/std::abs(cell->info().volume()) * ( pos_av_facet-CGAL::ORIGIN );
                         }
                 }
         }
@@ -591,7 +594,8 @@ Real TemplateFlowEngine_@TEMPLATE_FLOW_NAME@<_CellInfo,_VertexInfo,_Tesselation,
 	const Vector3r& p1 = positionBufferCurrent[cell->vertex ( 1 )->info().id()].pos;
 	const Vector3r& p2 = positionBufferCurrent[cell->vertex ( 2 )->info().id()].pos;
 	const Vector3r& p3 = positionBufferCurrent[cell->vertex ( 3 )->info().id()].pos;
-	Real volume = inv6 * ((p0-p1).cross(p0-p2)).dot(p0-p3);
+	Real volume = -inv6 * ((p0-p1).cross(p0-p2)).dot(p0-p3);
+	if (/*debug && */volume<0) cerr<<"negative volume for an ordinary pore (temp warning, should still be safe)"<<endl; 
         if ( ! ( cell->info().volumeSign ) ) cell->info().volumeSign= ( volume>0 ) ?1:-1;
         return volume;
 }
