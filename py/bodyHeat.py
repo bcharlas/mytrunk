@@ -84,7 +84,7 @@ def initHeatPropsList(bodyList, iniTemp, Cp, heatCond, flowThermalExchange=False
     listCp.append(Cp)
     listHeatCond.append(heatCond)
 
-def heatConductivity():
+def heatConductivity(timeStepFactor=1):
     global bodyTemp
     global heatBodies
     global listCp
@@ -166,8 +166,8 @@ def heatConductivity():
                             dQ = surfaceRatio* 4. * rij / ((1/k1+1/k2)) * (T1-T2) # Tsory et al.
                             #dQ = k1*k2 / ((r1-pene/2)*k2 +(r2-pene/2)*k1)* np.pi * 1/4 * dij**2* (T1-T2) * 2 * min(m1*Cp1,m2*Cp2)/(m1*Cp1 + m2*Cp2)
                             #
-                            dT1=-O.dt *dQ/(m1*Cp1)
-                            dT2=O.dt *dQ/(m2*Cp2)
+                            dT1=-O.dt*timeStepFactor *dQ/(m1*Cp1)
+                            dT2=O.dt*timeStepFactor *dQ/(m2*Cp2)
                             #
                             if (abs(dT1) < abs(T1-Tc)) and (abs(dT2) < abs(Tc-T2)):
                                 incBodyTemp[index1]+=dT1 

@@ -15,7 +15,7 @@ import cellHeat
 mass_scaling=1.0e21
 
 
-
+" Parameters of the reaction"
 # Enthalpies & Entropies of reactions
 #-------------------------------------
 # 1-8
@@ -30,7 +30,7 @@ refWeight=5.1*1e-6*mass_scaling# weight in t corresponding to paper "Surface ads
 refRad=70e-3/2#radius in mm of the average grain size in the reference mesurement
 refVol=90.*1e3#volume of gas used in the reference mesurement
 #
-k_m=0.8594
+
 
 E_a=32.9*1e6 # mJ/mol
 k_a=9.5e3 #mol/s
@@ -44,7 +44,9 @@ N_d=1. # check unit
 
 M_0=158.*1e-6*mass_scaling #t/mol
 M_NH3=17.05*1e-6*mass_scaling #t/mol
-
+#
+k_m=(8*M_NH3)/M_0 # mass increase coefficient
+k_v=1 # volume increase coefficient
 
 # Volumetric mass 
 Rho_0=2.6*1e-9*mass_scaling #kg/m3
@@ -59,6 +61,7 @@ k_1= 0.1 #mJ/mm/K/s
 k_8= 0.48 #mJ/mm/K/s
 DL=0.025# fictive distance between salt and wall in m
 
+s_min=0.125
 s_max=1
 
 # Initial parameters
@@ -82,19 +85,23 @@ dt=O.dt
 
 sorpBodies=[]
 #
-incBodySorp=[]
+incBodyMass=[]
+incBodyTemp=[]
+incP=[]
 #
 bodySat=[]
 #
 bodyMass0=[] # in moles
 bodyAbsMax=[] # in moles
 #
+
 v0=[]
 
 def initSorpPropsList(bodyList, s_ini, s_max, Cp):
   
   global sorpBodies
-  global incBodySorp
+  global incBodyMass
+  global incBodyTemp
   global bodyMass0
   global bodySat
   global V0
@@ -102,34 +109,40 @@ def initSorpPropsList(bodyList, s_ini, s_max, Cp):
   
   sorpBodies=[]
   #
-  incBodySorp = []
+  incBodyMass = []
   #
   V0=[]
-
+  #
+  
   #
   for b in bodyList:
     sorpBodies.append(b)
     #
-    incBodySorp.append(0.) 
+    incBodyMass.append(0.)
+    incBodyTemp.append(0.)
     #
-    bodyMass0.append(O.bodies[b].state.mass/ (k_m*s_ini + 1.)) # mass of the body without nh3 absorbed
+    bodyMass0.append(O.bodies[b].state.mass*1/(1+s_ini*k_m)) # mass of the body without nh3 absorbed
     bodySat.append(s_ini)
     #
-    bodyHeat.listCp[bodyHeat.heatBodies.index(b)] = Cp #/ (M_0 + s_ini * M_NH3)
-    bodyHeat.listHeatCond[bodyHeat.heatBodies.index(b)] = (0.5343-0.0543*s_ini)
+    #bodyHeat.listCp[bodyHeat.heatBodies.index(b)] = Cp #/ (M_0 + s_ini * M_NH3)
+    #bodyHeat.listHeatCond[bodyHeat.heatBodies.index(b)] = (0.5343-0.0543*s_ini)
     #
-    V0.append(4./3. * np.pi * np.power(O.bodies[b].shape.radius,3.) / (2.65*s_ini + 1.08))
+    V0.append(4./3. * np.pi * np.power(O.bodies[b].shape.radius,3.) *1/(1+s_ini*k_v))
 
 
 # SIMULATION
 #--------------
 # WARNING no temperature of the cell yet!
-def sorption(flow):
+def sorption(flow, timeStepFactor=1):
     global sorpBodies
-    global incBodySorp
+    global incBodyMass
+    global incP
+    global incBodyTemp
     global bodySat
     global bodyMass0
     global s_max
+    
+    incP=[0.]*flow.nCells()
     
     # ABSORPTION / DESORPTION
     for i in range(flow.nCells()):
@@ -139,7 +152,7 @@ def sorption(flow):
         #
         if Vc>0. and Tc>0. and pc>0.:
             # HERE INSERT A LIST OF 4 "r" so that the r will be adjusted if it is too big
-            r_List=[]
+            #r_List=[]
             dr=0.
             dP = 0
             #
@@ -168,19 +181,30 @@ def sorption(flow):
                     r_d=k_d*np.exp(-E_d/(R*Tb))*(s)*p_rel # desorption reaction rate
                     #
                     #r=(r_a-r_d) * bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * Vc/refVol * 10. #overal reaction rate
-
-                    if p_rel >0.:
+                    
+                    if p_rel==0:
+                        continue
+                    elif p_rel >0.:
                         r= r_a 
                     else:
                         r= r_d
                     
+                    if len(O.bodies[b].intrs())>0:
+                        r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) #* mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100
+                    else:
+                        r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/4.
+                    #
+                    # Incrementing
+                    incBodyMass[sorpBodies.index(b)] += r * M_NH3 * O.dt*timeStepFactor # MASS increment of the body
+                    incP[i] -=r*O.dt*timeStepFactor * R * Tc / Vc
+                    incBodyTemp[bodyHeat.heatBodies.index(b)] += DH_surf *r * O.dt*timeStepFactor / (O.bodies[b].state.mass * bodyHeat.listCp[bodyHeat.heatBodies.index(b)]) #inc Body Temperature
+                    #
+            '''
+                    if r>0 and (((incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)]) +s < s_max)) and ( ((incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/k_m/bodyMass0[sorpBodies.index(b)] +s>0.)):
+                        #print (incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)])
                     
-                    r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) #* mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100.
-                    
-                    if r>0 and (((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)]) +s < s_max)) and ( ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/k_m/bodyMass0[sorpBodies.index(b)] +s>0.)):
-                        #print (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/(k_m*bodyMass0[sorpBodies.index(b)])
-                        r_List.append((b,r))
-                        dP -= r*O.dt * R * Tc / Vc # incP
+                    r_List.append((b,r))
+                    dP -= r*O.dt*timeStepFactor * R * Tc / Vc # incP
                         
 
             
@@ -199,16 +223,16 @@ def sorption(flow):
             #print('rList' + str(r_List))
             for i in range(len(r_List)):
                 if r_List[i][0] in sorpBodies:
-                    incBodySorp[sorpBodies.index(r_List[i][0])] += ratioP *r_List[i][1] * M_NH3 * O.dt # MASS increment of the body
-                    dQ = ratioP * DH_surf *r_List[i][1] * O.dt/R
-                    bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(r_List[i][0])] += dQ / (O.bodies[r_List[i][0]].state.mass * bodyHeat.listCp[bodyHeat.heatBodies.index(r_List[i][0])]) #inc Body Temperature
-            
+                    incBodyMass[sorpBodies.index(r_List[i][0])] += ratioP *r_List[i][1] * M_NH3 * O.dt*timeStepFactor # MASS increment of the body
+                    dQ = ratioP * DH_surf *r_List[i][1] * O.dt*timeStepFactor
+                    incBodyTemp[bodyHeat.heatBodies.index(r_List[i][0])] += dQ / (O.bodies[r_List[i][0]].state.mass * bodyHeat.listCp[bodyHeat.heatBodies.index(r_List[i][0])]) #inc Body Temperature
+            '''
                     
 '''
-                        if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s < s_max):
+                        if ((incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s < s_max):
                             
                             if (pc + cellHeat.incP[i] - r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())) > 0:# safety to avoid having negative pressure
-                                incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
+                                incBodyMass[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
                                 # pressure increment of the cell
                                 cellHeat.incP[i] -= r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())
                                 # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
@@ -216,10 +240,10 @@ def sorption(flow):
                             else:
                                 print("Pressure increment too big !!!  dP:" + str(r*O.dt * R * Tc / Vc))
                         else:
-                            print('s :' + str(s) + '    (incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] :' + str((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)]))
+                            print('s :' + str(s) + '    (incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] :' + str((incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)]))
                     elif r<0 and (s>0):
-                        if ((incBodySorp[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s > 0):
-                            incBodySorp[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
+                        if ((incBodyMass[sorpBodies.index(b)]+M_NH3*r*O.dt)/0.8594/bodyMass0[sorpBodies.index(b)] + s > 0):
+                            incBodyMass[sorpBodies.index(b)] += M_NH3*r*O.dt # MASS increment of the body
                             # pressure increment of the cell
                             cellHeat.incP[i] -= r*O.dt * R * Tc / Vc /len(O.bodies[b].intrs())
                             # temperature increment of the body due to reaction exo/endo-thermy WARNING it should be scaled to the mass !!!
@@ -261,10 +285,10 @@ def sorption(flow):
                     # mass increment - checking if mass remains >0 
                     if not( ((dSat>0) and (s1>= s_max))   and   ((dSat<0) and (s1 <= 0))  ):
                         if not( ((dSat<0) and (s2>= s_max))   and   ((dSat>0) and (s2 <= 0))  ):
-                            if ((incBodySorp[index1] + dSat*m02/(m01+m02)*0.8594)>0) or (abs(incBodySorp[index1] + dSat*m02/(m01+m02)*0.8594)<O.bodies[i.id1].state.mass):
-                                if ((incBodySorp[index2] + dSat*m01/(m01+m02)*0.8594)>0) or (abs(incBodySorp[index2] + dSat*m01/(m01+m02)*0.8594)<O.bodies[i.id2].state.mass):
-                                    incBodySorp[index1] += dSat*m02/(m01+m02)*0.8594 # scaling difference to the mass - 
-                                    incBodySorp[index2] -= dSat*m01/(m01+m02)*0.8594 # scaling difference to the mass - 
+                            if ((incBodyMass[index1] + dSat*m02/(m01+m02)*0.8594)>0) or (abs(incBodyMass[index1] + dSat*m02/(m01+m02)*0.8594)<O.bodies[i.id1].state.mass):
+                                if ((incBodyMass[index2] + dSat*m01/(m01+m02)*0.8594)>0) or (abs(incBodyMass[index2] + dSat*m01/(m01+m02)*0.8594)<O.bodies[i.id2].state.mass):
+                                    incBodyMass[index1] += dSat*m02/(m01+m02)*0.8594 # scaling difference to the mass - 
+                                    incBodyMass[index2] -= dSat*m01/(m01+m02)*0.8594 # scaling difference to the mass - 
                     #
                     # temperature increments of the bodies
                     bodyHeat.incBodyTemp[bodyHeat.heatBodies.index(i.id1)] +=DH*dSat*m02/(m01+m02)*0.8594/M_NH3/bodyHeat.listCp[bodyHeat.heatBodies.index(i.id1)] * O.dt # temperature increment of the body due to reaction exo/endo-thermy
