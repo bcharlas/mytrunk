@@ -39,6 +39,7 @@
 
 #include <core/Timing.hpp>
 #include <lib/serialization/ObjectIO.hpp>
+#include <csignal>
 
 namespace py = boost::python;
 
@@ -124,7 +125,7 @@ class pyBodyContainer{
 		const shared_ptr<Clump> clump(YADE_PTR_CAST<Clump>(clumpBody->shape));
 		if (clump->members.size()==1 ){
 			Clump::del(clumpBody,memberBody); //phD was not commented out
-			for (int i=0; i<clump->ids.size(); i++){
+			for (unsigned i=0; i<clump->ids.size(); i++){
 				if (clump->ids[i] == memberBody->getId()){
 					clump->ids.erase(clump->ids.begin()+i);
 				}
@@ -134,7 +135,7 @@ class pyBodyContainer{
 			
 		}else{
 			Clump::del(clumpBody,memberBody); //pHD was not commented out
-			for (int i=0; i<clump->ids.size(); i++){
+			for (unsigned i=0; i<clump->ids.size(); i++){
 				if (clump->ids[i] == memberBody->getId()){
 					clump->ids.erase(clump->ids.begin()+i);
 				}
