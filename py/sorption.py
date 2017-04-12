@@ -12,7 +12,7 @@ import bodyHeat
 import cellHeat
 
 
-mass_scaling=1.0e21
+mass_scaling=1.0#e21
 
 
 " Parameters of the reaction"
@@ -41,8 +41,20 @@ E_d=32.9*1e6 #mJ/mol
 k_d=9.5e3 #mol/s
 M_d=1. # check unit
 N_d=1. # check unit
+'''
+E_a=48.243*1e6 # mJ/mol
+k_a=1.6*1e6 #molNH3 /molSrCl2 /s
+M_a=0.7 # check unit
+N_a=1.6 # check unit
+#
+E_d=48.243*1e6 #mJ/mol
+k_d=11.0*1e6 #molNH3 /molSrCl2 /s
+M_d=2. # check unit
+N_d=2.5# check unit
+'''
 
-M_0=158.*1e-6*mass_scaling #t/mol
+
+M_0=158.53*1e-6*mass_scaling #t/mol
 M_NH3=17.05*1e-6*mass_scaling #t/mol
 #
 k_m=(8*M_NH3)/M_0 # mass increase coefficient
@@ -110,6 +122,7 @@ def initSorpPropsList(bodyList, s_ini, s_max, Cp):
   sorpBodies=[]
   #
   incBodyMass = []
+  incBodyTemp=[0]
   #
   V0=[]
   #
@@ -146,7 +159,7 @@ def sorption(flow, timeStepFactor=1):
     
     # ABSORPTION / DESORPTION
     for i in range(flow.nCells()):
-        Tc=cellHeat.cellTemp[i]
+        Tc=273.#cellHeat.cellTemp[i]# WARNING!!! to be corrected - include temperature property inside c++ otherwise it does not work because of fluctuating number of cells.
         pc=flow.getCellPressure(i)
         Vc=flow.volumeVoidPore(i)*np.sign(flow.volumePore(i))# is it necessary?
         #
@@ -157,6 +170,8 @@ def sorption(flow, timeStepFactor=1):
             dP = 0
             #
             mc=pc * Vc * M_NH3 / (R*Tc)
+            if mc <= 0.:
+                continue
             #
             for b in flow.getVertices(i):
                 if b in sorpBodies:
@@ -177,22 +192,46 @@ def sorption(flow, timeStepFactor=1):
                         print('error with Ksurf: ' + str(Ksurf))
                         break
                     #
+                    
+                    # version from publication
                     r_a=k_a*np.exp(-E_a/(R*Tb))*(1-s)*p_rel # absorption reaction rate
                     r_d=k_d*np.exp(-E_d/(R*Tb))*(s)*p_rel # desorption reaction rate
+                    '''
+                    # version from study of Andreas Ammitzbøll
+                    r_a=k_a*np.exp(-E_a/(R*Tb))*(1-s)**M_a*p_rel**N_a
+                    r_d=-k_d*np.exp(-E_d/(R*Tb))*(s)**M_d*(-p_rel)**N_d
+                    '''
                     #
                     #r=(r_a-r_d) * bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) * Vc/refVol * 10. #overal reaction rate
                     
                     if p_rel==0:
+                        r=0.
                         continue
                     elif p_rel >0.:
-                        r= r_a 
+                        if s<1:
+                            r= r_a
+                        else:
+                            r=0.
+                            continue
                     else:
-                        r= r_d
+                        if s>0.:
+                            r= r_d
+                        else:
+                            r=0.
+                            continue
                     
+                    # version from publication
                     if len(O.bodies[b].intrs())>0:
                         r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/len(O.bodies[b].intrs()) #* mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100
                     else:
                         r *= bodyMass0[sorpBodies.index(b)] /refWeight * pow(abs(refRad/Rb),0.25)/4.
+                    '''
+                    # version from study of Andreas Ammitzbøll
+                    if len(O.bodies[b].intrs())>0:
+                        r *= (bodyMass0[sorpBodies.index(b)] /M_0) /len(O.bodies[b].intrs()) #* mc / (mc+O.bodies[b].state.mass)#Vc/refVol * 100
+                    else:
+                        r *= (bodyMass0[sorpBodies.index(b)] /M_0) /4.
+                    '''
                     #
                     # Incrementing
                     incBodyMass[sorpBodies.index(b)] += r * M_NH3 * O.dt*timeStepFactor # MASS increment of the body

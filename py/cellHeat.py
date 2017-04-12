@@ -118,7 +118,8 @@ def heatConductivity(exceptions, flow):
     #incTemp = [0.]*len(heatCells) # reinitialize the temperature increment
     #
     for i in range(flow.nCells()):
-        Tc=cellTemp[i]
+        #Tc=cellTemp[i] # WARNING!!! to be corrected - include temperature property inside c++ otherwise it does not work because of fluctuating number of cells.
+        Tc = 273.
         #print Tc
         pc=flow.getCellPressure(i)
         Vc=flow.volumeVoidPore(i)
